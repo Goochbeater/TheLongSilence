@@ -64,9 +64,9 @@ await page.goto(URL, { waitUntil: 'domcontentloaded' });
  */
 await page.waitForFunction(
   () => { const b = document.getElementById('bootStart'); return b && !b.hidden; },
-  { timeout: 300000 });
+  null, { timeout: 300000 });
 await page.evaluate(() => document.getElementById('bootStart').click());
-await page.waitForFunction(() => window.__game && window.__game.started, { timeout: 120000 });
+await page.waitForFunction(() => window.__game && window.__game.started, null, { timeout: 120000 });
 await page.waitForTimeout(1500);
 
 const r = await page.evaluate(async () => {

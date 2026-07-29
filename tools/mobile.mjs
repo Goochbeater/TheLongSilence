@@ -312,7 +312,7 @@ for (const p of PROFILES) {
     await page.waitForFunction(
       () => window.__game.engine.width === innerWidth
         && window.__game.engine.height === innerHeight,
-      { timeout: 20000 }).catch(() => {});
+      null, { timeout: 20000 }).catch(() => {});
     const after = await page.evaluate(() => ({
       layout: document.documentElement.dataset.layout,
       held: window.__game.input.touchL.length(),
@@ -327,7 +327,7 @@ for (const p of PROFILES) {
     await page.setViewportSize(p.viewport);
     await page.waitForFunction(
       () => document.documentElement.dataset.layout === 'compact',
-      { timeout: 20000 }).catch(() => {});
+      null, { timeout: 20000 }).catch(() => {});
     const back = await page.evaluate(() => document.documentElement.dataset.layout);
     ok(back === 'compact', 'and folding back returns to compact', `got ${back}`);
   }

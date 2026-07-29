@@ -30,13 +30,22 @@ export async function bootGame(page, { setup = null, settle = 0, after = null, t
         }
         // fell through: the page reloaded under us, so boot it properly below
       }
+      /* `null` for the page function's argument, then the options.
+         `waitForFunction(fn, {timeout})` puts the options object in the `arg`
+         slot, where it is serialised, handed to the page function, and ignored
+         — and the wait silently runs on the thirty-second default instead. The
+         budgets here are deliberate: a cold boot bakes cubemaps and warms
+         shaders, and on a machine without a GPU the desktop tier needs every
+         second of the ninety. Measured: this was timing out at thirty and
+         retrying four times, which reads as the page reloading rather than as
+         a wait that was never given the time it asks for. */
       await page.waitForFunction(
         () => { const b = document.getElementById('bootStart'); return b && !b.hidden; },
-        { timeout: 90000 });
+        null, { timeout: 90000 });
       await page.evaluate(() => document.getElementById('bootStart').click());
             // Generous on purpose: boot bakes cubemaps, warms shaders and now loads
       // model assets, and a slow cold start is not a failure.
-      await page.waitForFunction(() => window.__game && window.__game.started, { timeout: 120000 });
+      await page.waitForFunction(() => window.__game && window.__game.started, null, { timeout: 120000 });
       await page.waitForTimeout(1500);
       if (setup) out = await page.evaluate(`(()=>{ const g = window.__game; return (${setup}); })()`);
       if (settle) await page.waitForTimeout(settle);
