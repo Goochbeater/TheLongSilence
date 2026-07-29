@@ -198,6 +198,7 @@ node tools/sheet.mjs a.png b.png --out s.png   # contact sheet — judge a set a
 node tools/levels.mjs shots/*.png              # tone statistics per frame
 node tools/judgeset.mjs                        # rebuild the review set in shots/judge/
 node tools/mobile.mjs                          # the four handset geometries, with touch
+node tools/desktop.mjs                         # the pointer path, after the touch one
 ```
 
 `levels.mjs` is the one that stops arguments. "It looks flat" is not
@@ -222,3 +223,10 @@ events, and asserts the ship responds; it also checks that no two controls
 overlap, that nothing is off screen, and that no touch target is under 40px.
 The frame rates it prints are software rasterisation and mean nothing about a
 handset.
+
+`desktop.mjs` is its opposite number and exists because making this run on a
+phone meant branching the engine's constructor and the input loop on "is this a
+handheld", and every one of those branches *takes something away* — the
+supersampling headroom, the cabin's shadow map, the ambient-occlusion chain. A
+phone is the one machine that will never notice a branch taken on the wrong
+hardware, so something has to check that a pointer device still gets all of it.
