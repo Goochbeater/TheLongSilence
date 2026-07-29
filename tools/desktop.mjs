@@ -13,7 +13,6 @@
 // device, is everything still switched on, and does the pointer still fly?
 import { chromium } from 'playwright';
 import { existsSync, readdirSync } from 'node:fs';
-import { bootGame } from './boot.mjs';
 
 function chromePath() {
   if (process.env.PW_CHROME) return process.env.PW_CHROME;
@@ -50,7 +49,25 @@ page.on('pageerror', (e) => errs.push(e.message));
 page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 
 await page.goto(URL, { waitUntil: 'domcontentloaded' });
-await bootGame(page);
+
+/* Booted here rather than through boot.mjs, on purpose.
+ *
+ * boot.mjs exists to survive the dev server hot-reloading a capture out from
+ * under itself, and pays for that with a ninety-second budget and four retries.
+ * This tool runs against the built bundle, where there is no hot reload to
+ * survive — and the desktop tier is the one configuration that does not fit in
+ * ninety seconds when there is no GPU: it bakes its sky at 1024 and renders at
+ * up to 2.8x device pixels, where a handheld bakes at 256 and renders at 0.85x.
+ * Measured on a software rasteriser, WAKE appears between 45 and 90 seconds and
+ * the boot is otherwise completely clean. Retrying that is not resilience, it
+ * is four consecutive timeouts; waiting longer once is the honest answer.
+ */
+await page.waitForFunction(
+  () => { const b = document.getElementById('bootStart'); return b && !b.hidden; },
+  { timeout: 300000 });
+await page.evaluate(() => document.getElementById('bootStart').click());
+await page.waitForFunction(() => window.__game && window.__game.started, { timeout: 120000 });
+await page.waitForTimeout(1500);
 
 const r = await page.evaluate(async () => {
   const g = window.__game;
