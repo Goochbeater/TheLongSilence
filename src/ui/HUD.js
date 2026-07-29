@@ -50,10 +50,14 @@ export class HUD {
       });
     });
 
-    if (game.input.hasTouch) this.el.touchUI.classList.remove('hidden');
+    // The touch layer un-hides itself when it mounts; it owns that element.
   }
 
-  show() { this.root.classList.remove('hidden'); requestAnimationFrame(() => this.root.classList.add('on')); }
+  show() {
+    this.root.classList.remove('hidden');
+    this.game.input.controls?.reveal();
+    requestAnimationFrame(() => this.root.classList.add('on'));
+  }
 
   onSystemChange() {
     for (const [, m] of this.markerPool) m.el.remove();
@@ -121,7 +125,10 @@ export class HUD {
     const showPrompt = !uiOpen && (st || g.mode === 'pilot');
     this.el.prompt.classList.toggle('hidden', !showPrompt);
     if (showPrompt) {
-      const key = g.input.hasTouch ? 'USE' : 'E';
+      // Name the button the player can actually see. On touch the flight set
+      // spells this one STAND, and a prompt reading USE next to a button
+      // reading STAND is a prompt for a control that does not exist.
+      const key = g.input.hasTouch ? (g.mode === 'pilot' ? 'STAND' : 'USE') : 'E';
       this.el.promptKey.textContent = key;
       if (g.mode === 'pilot') {
         this.el.promptLabel.textContent = 'LEAVE THE HELM';
@@ -180,7 +187,6 @@ export class HUD {
         if (canLand) keys.push(['L', 'land']);
       }
       this.el.hints.innerHTML = keys.map(([k, v]) => `<span><kbd>${k}</kbd>${v}</span>`).join('');
-      this._syncTouchLabels();
       // The row is small and at the bottom edge. Coming into range of a world
       // you can actually set down on is worth saying out loud, once.
       if (canLand && !wasLand && g.target) {
@@ -207,19 +213,6 @@ export class HUD {
         `${g.engine.fps.toFixed(0)} fps  ${g.engine.pixelRatio.toFixed(2)}x  q=${g.quality}  ${g.mode}\n` +
         `draws ${g.engine.drawCalls}  tris ${(g.engine.triangles / 1000).toFixed(0)}k`;
     }
-  }
-
-  _syncTouchLabels() {
-    const walk = this.game.mode === 'walk';
-    const map = walk
-      ? { use: 'USE', boost: 'RUN', scan: 'MAP', auto: 'ARC', fold: 'VIEW' }
-      : { use: 'STAND', boost: 'BOOST', scan: 'SCAN', auto: 'AUTO', fold: 'FOLD' };
-    document.querySelectorAll('#touchBtns .tb').forEach((b) => {
-      const t = map[b.dataset.act];
-      if (t) b.textContent = t;
-    });
-    const thr = document.getElementById('touchThr');
-    if (thr) thr.style.display = walk ? 'none' : '';
   }
 
   _updateMarkers(active) {

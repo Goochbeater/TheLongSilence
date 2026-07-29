@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { PostFX } from '../gfx/PostFX.js';
+import { device, prefs } from './device.js';
 
 /* Renderer, sizing, quality tiering and the frame loop. */
 
@@ -19,6 +20,20 @@ import { PostFX } from '../gfx/PostFX.js';
  * fast machine is still a fast machine. Only a genuinely small *screen* counts.
  */
 export function detectQuality() {
+  /* Handhelds are decided first and are not negotiable from here.
+   *
+   * Both devices this was tuned against report eight cores and eight gigabytes
+   * — a Pixel 9a and a Z Fold 4 are indistinguishable from a laptop by every
+   * number `navigator` will hand over — so the heuristics below put them on
+   * `medium`, which is a 1.5x device-pixel ceiling. On a Pixel 9a in landscape
+   * that is 1385x617 of raymarched atmosphere before a six-level bloom chain,
+   * and it does not hold thirty. What the heuristics cannot see is the thermal
+   * envelope, and that is the whole difference. A handheld starts at `low` and
+   * the dynamic resolution controller climbs from there; a player who disagrees
+   * can say so in the control settings, which is a better place for that
+   * argument than a guess made before the first frame. */
+  if (device.handheld) return prefs.quality !== 'auto' ? prefs.quality : 'low';
+
   const mem = navigator.deviceMemory;                     // undefined off Chromium
   const cores = navigator.hardwareConcurrency || 4;
   const coarse = window.matchMedia('(hover: none)').matches;
@@ -73,10 +88,15 @@ export class Engine {
       preserveDrawingBuffer: false,
     });
     this.renderer.autoClear = true;
-    // Contact shadows inside the hull; the exterior has nothing to cast onto.
-    this.renderer.shadowMap.enabled = true;
+    /* Contact shadows inside the hull; the exterior has nothing to cast onto.
+       Off on a handheld: a shadow map is a second full pass over the cabin's
+       geometry every frame, and on a tile-based GPU an extra render pass costs
+       a full tile flush before it costs any shading. The cabin loses the soft
+       darkening under the consoles, which is the least of what is on screen and
+       the cheapest thing here worth four milliseconds. */
+    this.renderer.shadowMap.enabled = !device.handheld;
     this.renderer.shadowMap.type = THREE.PCFShadowMap;
-    this.renderer.shadowMap.autoUpdate = true;
+    this.renderer.shadowMap.autoUpdate = !device.handheld;
     this.renderer.setClearColor(0x000000, 1);
     this.renderer.toneMapping = THREE.NoToneMapping;   // AgX happens in PostFX
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
@@ -95,8 +115,19 @@ export class Engine {
        headroom renders supersampled and resolves sharp, a scene without falls
        back to native rather than dropping frames. It is self-balancing, which
        is why the ceiling can be generous. */
-    const SS = quality === 'high' ? 1.4 : quality === 'medium' ? 1.15 : 1.0;
-    const base = quality === 'low' ? 1.0 : quality === 'medium' ? 1.5 : 2.0;
+    const hh = device.handheld;
+    /* Handhelds get no supersampling headroom at all and a ceiling *below* one
+       device pixel per CSS pixel.
+       A Pixel 9a is 411x923 CSS at a device ratio of 2.625: rendering at 1.0
+       here means 1080x2424 native, which is 2.6 megapixels of per-fragment
+       procedural detail with no texture and no mip chain to help. 0.85 is
+       ~1.9Mp and is where a G715 stops being fill-bound on this scene. The
+       screen is 6.3 inches, held at arm's length, at ~430 pixels per inch —
+       the resolution being given up here is below what the eye resolves, which
+       is exactly the trade the dynamic controller was built to make and the one
+       case where it can be made up front with confidence. */
+    const SS = hh ? 1.0 : quality === 'high' ? 1.4 : quality === 'medium' ? 1.15 : 1.0;
+    const base = hh ? 0.85 : quality === 'low' ? 1.0 : quality === 'medium' ? 1.5 : 2.0;
     // Start at native and *climb*. Starting at the ceiling means every boot
     // spends its first few seconds rendering eleven megapixels and ratcheting
     // back down, which is both slow and visible — each step rebuilds a dozen
@@ -107,8 +138,32 @@ export class Engine {
     // worth buying frames with, so on a pointer device we stop there and would
     // rather drop frames than ship a blurry frame.
     this.prCeil = base * SS;
-    this.prFloor = quality === 'low' ? 0.7 : 1.0;
+    // The floor is where "buy frames with sharpness" stops being worth it. On a
+    // pointer device that is one device pixel per CSS pixel. On a 430ppi panel
+    // it is a long way further down, and having somewhere to go is what keeps a
+    // thermally throttled phone at a steady frame rate instead of a sawtooth.
+    this.prFloor = hh ? 0.45 : quality === 'low' ? 0.7 : 1.0;
     this.superSample = SS;
+
+    /* Frame-rate target.
+     *
+     * Sixty on a desktop, because it is a 60Hz wall the controller can push up
+     * against and stop. On a handheld the wall is somewhere else — the Pixel 9a
+     * is a 120Hz panel, so vsync quantises the achievable rates to 120, 60, 40,
+     * 30 — and a controller chasing 60 on a scene that can hold 48 will ratchet
+     * to the floor, sit there at a smeared 0.45x, and still not get 60. Aiming
+     * at a band means it settles wherever the hardware actually is, at the best
+     * resolution that holds it. Under 44 is a real problem; over 58 there is
+     * headroom worth spending on pixels.
+     *
+     * Recovery is deliberately slower than the descent on a handheld. A phone
+     * that has been running this for five minutes is a different machine from
+     * one that has been running it for thirty seconds, and climbing back at the
+     * same rate it fell just re-runs the whole descent every time a fan-less
+     * SoC catches its breath. */
+    this.fpsDown = hh ? 44 : 57;
+    this.fpsUp = hh ? 58 : 62;
+    this.climbSteps = hh ? 6 : 3;
     this.pixelRatio = Math.min((window.devicePixelRatio || 1) * SS, this.maxPixelRatio);
     this._warm = 0;
 
@@ -118,7 +173,12 @@ export class Engine {
     this.post = new PostFX(this.renderer, quality);
     this.post.msaa = this.flags.msaa;      // read by setSize, called below
     this.post.enabled.streak = quality !== 'low';
-    this.post.enabled.ao = this.flags.ao;
+    /* AO is four passes and a full-resolution float target, and it also forces
+       the multisampled depth buffer to be resolved into a texture every frame —
+       a real blit of real bandwidth, which is the resource a mobile GPU has
+       least of. It is the single most expensive optional thing in the chain and
+       the least visible on a six-inch screen. */
+    this.post.enabled.ao = this.flags.ao && !device.handheld;
 
     this.clock = new THREE.Clock();
     this.time = 0;
@@ -129,9 +189,53 @@ export class Engine {
     this.sunUV = new THREE.Vector2(0.5, 0.5);
     this.sunVis = 0;
 
+    /* Context loss, which on a handheld is a matter of when.
+     *
+     * Android reclaims GPU memory from backgrounded tabs aggressively, and this
+     * game holds a lot of it: an HDR scene target, a dozen post targets, a
+     * nebula cubemap and one baked albedo/height cubemap per world. Take a call
+     * mid-flight and come back and the context is frequently gone. Without a
+     * handler the canvas is simply black forever, with nothing in the console
+     * and nothing on screen, which reads as the game having crashed.
+     *
+     * `preventDefault` is what makes restoration *possible* at all — without it
+     * the browser will never fire `webglcontextrestored`. But possible is not
+     * the same as free: every cubemap here was baked by rendering into it, and
+     * three restores textures it uploaded, not ones the GPU generated. Rebaking
+     * the world from inside a lost-context handler is a rewrite, and pretending
+     * to recover and then rendering a world with black planets in it is worse
+     * than saying what happened. So: stop the loop, say so, offer the reload.
+     */
+    canvas.addEventListener('webglcontextlost', (e) => {
+      e.preventDefault();
+      this.contextLost = true;
+      this.onContextLost?.();
+    }, false);
+    canvas.addEventListener('webglcontextrestored', () => { this.contextLost = false; }, false);
+
     this.resize();
-    window.addEventListener('resize', () => this.requestResize());
-    window.addEventListener('orientationchange', () => setTimeout(() => this.requestResize(), 120));
+
+    /* Unfolding a Z Fold 4 is not one resize, it is a burst of them.
+     *
+     * The browser animates between two physically different panels — 882x344
+     * to 1104x884 — and fires `resize` throughout, with intermediate sizes that
+     * are neither. `requestResize` already coalesces everything inside one
+     * frame into a single rebuild, but consecutive frames with different sizes
+     * each rebuild a dozen render targets and restart the eye adaptation, so
+     * an unfold cost five full teardowns and five visible exposure resets.
+     *
+     * Waiting for the size to stop moving costs a sixth of a second of a
+     * stretched image and replaces all of that with one rebuild. Only on a
+     * handheld: on a desktop a window drag wants the canvas to track the frame,
+     * and there is no burst to absorb.
+     */
+    const bump = device.handheld
+      ? () => { clearTimeout(this._rt); this._rt = setTimeout(() => this.requestResize(), 140); }
+      : () => this.requestResize();
+    window.addEventListener('resize', bump);
+    window.addEventListener('orientationchange', () => setTimeout(bump, 120));
+    window.visualViewport?.addEventListener('resize', bump);
+    device.onChange(bump);
   }
 
   /* Ask for a resize at the top of the next frame rather than taking it now.
@@ -203,17 +307,17 @@ export class Engine {
        frames. The upper threshold is above sixty on purpose: on a 60 Hz panel
        the measured rate caps at 60, so anything at or under it would ratchet
        the resolution up forever against a wall it cannot see past. */
-    if (this.fps < 57 && this.maxPixelRatio > this.prFloor) {
+    if (this.fps < this.fpsDown && this.maxPixelRatio > this.prFloor) {
       this.maxPixelRatio = Math.max(this.prFloor, this.maxPixelRatio - 0.12);
       this._adaptAcc = 0;
       this._cool = 2.0;
       this.requestResize();
-    } else if (this.fps > 62 && this.maxPixelRatio < this.prCeil) {
+    } else if (this.fps > this.fpsUp && this.maxPixelRatio < this.prCeil) {
       // Recover at a comparable rate to the way down. The old controller fell
       // 0.18 every half second and climbed 0.1 every three, so any transient
       // dip cost a permanent chunk of resolution.
       this._adaptAcc++;
-      if (this._adaptAcc >= 3) {
+      if (this._adaptAcc >= this.climbSteps) {
         this._adaptAcc = 0;
         this._cool = 2.0;
         this.maxPixelRatio = Math.min(this.prCeil, this.maxPixelRatio + 0.12);

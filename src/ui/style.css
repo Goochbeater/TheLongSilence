@@ -278,28 +278,193 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 .ms-go:disabled{opacity:.3;cursor:default}
 .ms-note{margin-top:14px;font-size:9px;letter-spacing:.14em;color:var(--dim);line-height:1.7}
 
-/* ============================ TOUCH ============================ */
-#touchUI{position:fixed;inset:0;z-index:30;pointer-events:none}
-.stick{position:absolute;bottom:calc(28px + var(--safe-b));width:118px;height:118px;border-radius:50%;
-  border:1px solid rgba(143,228,255,.16);background:rgba(6,14,22,.22);pointer-events:auto;
-  backdrop-filter:blur(3px);transition:opacity .3s;opacity:.5}
-.stick.act{opacity:1;border-color:rgba(143,228,255,.4)}
-.stick i{position:absolute;left:50%;top:50%;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
-  border:1px solid rgba(143,228,255,.45);background:rgba(143,228,255,.10);
-  box-shadow:0 0 16px rgba(143,228,255,.18)}
-#stickL{left:calc(22px + var(--safe-l))}
-#stickR{right:calc(22px + var(--safe-r))}
-#touchBtns{position:absolute;right:calc(18px + var(--safe-r));top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:9px;pointer-events:auto}
-.tb{width:58px;height:38px;border:1px solid rgba(143,228,255,.2);background:rgba(6,14,22,.35);
-  font-size:9px;letter-spacing:.12em;color:rgba(190,226,240,.75);border-radius:2px;
-  backdrop-filter:blur(4px);transition:.12s}
-.tb:active,.tb.on{background:rgba(143,228,255,.2);color:#fff;border-color:var(--cy)}
-#touchThr{position:absolute;left:calc(18px + var(--safe-l));top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:9px;pointer-events:auto}
-.tt{width:44px;height:44px;border:1px solid rgba(143,228,255,.2);background:rgba(6,14,22,.35);
-  font-size:16px;color:rgba(190,226,240,.75);border-radius:2px;backdrop-filter:blur(4px)}
-.tt:active{background:rgba(143,228,255,.2);color:#fff}
+/* ============================ TOUCH ============================
+   Sizes come from JS (core/TouchControls.js sets --tc-*), because they are a
+   function of the layout class *and* of a player setting, and encoding that
+   product in media queries means eight breakpoints that disagree with each
+   other. What lives here is everything that is genuinely presentational: where
+   things sit relative to the safe area and the hinge, and what they look like.
+
+   `--tc-edge` is the one composite the layout leans on: the real distance from
+   the physical edge of the screen to where a control may start. It stacks the
+   designed padding, the notch/gesture inset, and the hinge band, so no rule
+   below has to remember all three. */
+#touchUI{position:fixed;inset:0;z-index:30;pointer-events:none;
+  --tc-hinge-l:0px;--tc-hinge-r:0px;--tc-hinge-b:0px;
+  --tc-edge-l:calc(var(--tc-pad) + var(--safe-l) + var(--tc-hinge-l));
+  --tc-edge-r:calc(var(--tc-pad) + var(--safe-r) + var(--tc-hinge-r));
+  --tc-edge-b:calc(var(--tc-pad) + var(--safe-b) + var(--tc-hinge-b));
+  --tc-edge-t:calc(var(--tc-pad) + var(--safe-t));
+  transition:opacity .45s ease}
+/* `pointer-events:none` on the root does not reach children that set it back to
+   auto, and every control here does. A cutscene with invisible-but-live buttons
+   under it is worse than one with visible buttons. */
+#touchUI.tc-out,#touchUI.tc-out *{opacity:0;pointer-events:none}
+
+/* ---- thumb zones.
+   Invisible, and much larger than the ring that appears inside them: the zone
+   is the control and the ring is only feedback. Sized as a fraction of the
+   viewport so a Fold's 1104px gives a thumb the whole corner it can actually
+   reach, rather than the same 118px box a 411px-tall phone gets. */
+.tc-zone{position:absolute;bottom:0;pointer-events:auto;touch-action:none;
+  width:calc(var(--tc-zw,42) * 1%);height:calc(var(--tc-zh,62) * 1%)}
+.tc-zone-l{left:0}
+.tc-zone-r{right:0}
+#touchUI[data-layout="compact"]{--tc-zw:42;--tc-zh:64}
+#touchUI[data-layout="roomy"]{--tc-zw:40;--tc-zh:52}
+#touchUI[data-layout="portrait"]{--tc-zw:50;--tc-zh:36}
+/* Left-handed: swap which half is which, nothing else. */
+#touchUI.mirror .tc-zone-l{left:auto;right:0}
+#touchUI.mirror .tc-zone-r{right:auto;left:0}
+
+/* ---- the ring itself, positioned in page coordinates at the touch point */
+.tc-stick{position:absolute;width:var(--tc-stick);height:var(--tc-stick);
+  margin:calc(var(--tc-stick) / -2) 0 0 calc(var(--tc-stick) / -2);
+  border-radius:50%;pointer-events:none;
+  border:1px solid rgba(143,228,255,.20);background:rgba(6,14,22,.20);
+  opacity:var(--tc-op);transition:opacity .18s ease}
+.tc-stick.act{opacity:1;border-color:rgba(143,228,255,.46)}
+/* A hairline crosshair inside the ring — with a floating stick there is no
+   fixed landmark on screen, so the ring has to say where its own centre is. */
+.tc-stick b{position:absolute;inset:0;border-radius:50%;
+  background:
+    linear-gradient(rgba(143,228,255,.16),rgba(143,228,255,.16)) center/1px 34% no-repeat,
+    linear-gradient(rgba(143,228,255,.16),rgba(143,228,255,.16)) center/34% 1px no-repeat}
+.tc-stick i{position:absolute;left:50%;top:50%;width:var(--tc-knob);height:var(--tc-knob);
+  margin:calc(var(--tc-knob) / -2) 0 0 calc(var(--tc-knob) / -2);border-radius:50%;
+  border:1px solid rgba(143,228,255,.5);background:rgba(143,228,255,.12);
+  box-shadow:0 0 18px rgba(143,228,255,.22)}
+/* Head-look reads amber, the same colour every "this is you, not the ship"
+   element in the cabin uses. */
+.tc-stick.look i{border-color:rgba(255,196,138,.6);background:rgba(255,196,138,.12);
+  box-shadow:0 0 18px rgba(255,196,138,.22)}
+
+/* ---- throttle rail */
+.tc-rail{position:absolute;left:var(--tc-edge-l);bottom:calc(var(--tc-edge-b) + var(--tc-stick) * .55);
+  width:calc(var(--tc-aux) * .78);height:var(--tc-rail);pointer-events:auto;touch-action:none;
+  display:flex;flex-direction:column;align-items:center;gap:5px;
+  opacity:var(--tc-op);transition:opacity .18s ease}
+#touchUI.mirror .tc-rail{left:auto;right:var(--tc-edge-l)}
+.tc-rail.act{opacity:1}
+.tc-rail-track{position:relative;flex:1;width:100%;
+  border:1px solid rgba(143,228,255,.22);background:rgba(6,14,22,.42);
+  clip-path:polygon(0 0,calc(100% - 6px) 0,100% 6px,100% 100%,6px 100%,0 calc(100% - 6px))}
+.tc-rail-fill{position:absolute;left:0;right:0;bottom:0;height:0%;
+  background:linear-gradient(0deg,rgba(143,228,255,.10),rgba(143,228,255,.30))}
+.tc-rail-grip{position:absolute;left:-4px;right:-4px;bottom:0;height:3px;margin-bottom:-1px;
+  background:var(--cy);box-shadow:0 0 12px rgba(143,228,255,.7)}
+.tc-rail.act .tc-rail-grip{background:#fff;box-shadow:0 0 18px rgba(143,228,255,.95)}
+/* Detents. Drawn on the track, not on the fill, so they stay visible above the
+   current setting — the point of a detent is that you can see where you are
+   heading, not where you have been. */
+.tc-rail-track::after{content:'';position:absolute;inset:0;pointer-events:none;
+  background:repeating-linear-gradient(0deg,rgba(143,228,255,.22) 0 1px,transparent 1px 25%)}
+.tc-rail-num{font-style:normal;font-size:10px;letter-spacing:.1em;color:#dff4ff;
+  text-shadow:0 1px 4px #000}
+.tc-rail label{font-size:7.5px;letter-spacing:.24em;color:var(--dim)}
+
+/* ---- action buttons */
+.tc-pad{position:absolute;display:flex;pointer-events:auto;gap:var(--tc-gap)}
+/* Main actions ride just above and inboard of the right thumb's rest position,
+   on the arc the thumb sweeps rather than in a column it has to reach across. */
+.tc-pad-main{right:var(--tc-edge-r);bottom:calc(var(--tc-edge-b) + var(--tc-stick) * .92);
+  flex-direction:column-reverse;align-items:flex-end}
+/* Aux is a row along the top, not a column down the side.
+   Seven buttons stacked is a 320px ladder, and on a 411px-tall screen that is
+   the whole right edge — it ran into the main actions at the bottom and it
+   forced each button down to 34px, which is under the size a thumb reliably
+   hits. Along the top there is 880px of width doing nothing, the row clears the
+   thumbs entirely, and every button can be full size. It wraps upward if the
+   width ever runs out, which is only portrait. */
+.tc-pad-aux{right:var(--tc-edge-r);top:var(--tc-edge-t);
+  flex-wrap:wrap-reverse;justify-content:flex-end;
+  max-width:calc(100% - var(--tc-edge-l) - var(--tc-edge-r) - 210px)}
+#touchUI.mirror .tc-pad-main{right:auto;left:var(--tc-edge-r);align-items:flex-start}
+#touchUI.mirror .tc-pad-aux{right:auto;left:var(--tc-edge-r);justify-content:flex-start}
+
+.tc-b{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:1.05;
+  border:1px solid rgba(143,228,255,.26);background:rgba(6,14,22,.42);
+  color:rgba(198,230,244,.86);letter-spacing:.1em;
+  clip-path:polygon(0 0,calc(100% - 7px) 0,100% 7px,100% 100%,7px 100%,0 calc(100% - 7px));
+  opacity:var(--tc-op);transition:opacity .12s,background .12s,border-color .12s;
+  touch-action:none;-webkit-user-select:none;user-select:none}
+.tc-b-main{width:calc(var(--tc-btn) * 1.5);height:var(--tc-btn);font-size:10px;
+  border-radius:0;background:rgba(8,18,28,.5)}
+.tc-b-aux{width:calc(var(--tc-aux) * 1.5);height:var(--tc-aux);font-size:8.5px}
+.tc-b.on{opacity:1;background:rgba(143,228,255,.26);border-color:var(--cy);color:#fff;
+  box-shadow:0 0 22px rgba(143,228,255,.28)}
+.tc-b.hot{border-color:rgba(143,228,255,.5);color:#e6f8ff}
+.tc-b.fold{border-color:rgba(255,196,138,.45);color:var(--am)}
+.tc-b.fold.on{background:rgba(255,196,138,.28);border-color:var(--am);box-shadow:0 0 22px rgba(255,196,138,.3)}
+.tc-b.ok{border-color:rgba(138,255,193,.5);color:var(--gn)}
+.tc-b.ok.on{background:rgba(138,255,193,.24);border-color:var(--gn)}
+/* LAND appears the moment it becomes possible. Announcing itself once is the
+   difference between a mechanic a player finds and one they never learn about. */
+.tc-b.ok{animation:tcIn .5s cubic-bezier(.2,.8,.2,1)}
+@keyframes tcIn{from{opacity:0;transform:translateX(14px)}}
+
+/* ---- system row: LOOK / RECENTRE / settings / fullscreen */
+.tc-sys{position:absolute;left:var(--tc-edge-l);top:var(--tc-edge-t);
+  display:flex;gap:var(--tc-gap);pointer-events:auto}
+#touchUI.mirror .tc-sys{left:auto;right:var(--tc-edge-l);flex-direction:row-reverse}
+.tc-sysb{height:calc(var(--tc-aux) * .8);min-width:calc(var(--tc-aux) * .8);padding:0 9px;
+  border:1px solid rgba(143,228,255,.2);background:rgba(6,14,22,.42);
+  font-size:8.5px;letter-spacing:.14em;color:rgba(186,214,230,.78);
+  opacity:var(--tc-op);touch-action:none}
+.tc-sysb.on{opacity:1;background:rgba(255,196,138,.24);border-color:var(--am);color:#fff}
+/* RECENTRE only means anything with the gyro live; hidden is better than inert.
+   LOOK is the same and is hidden from JS instead, because whether it applies is
+   a property of the button set rather than of the context name — two rules for
+   one decision is how they end up disagreeing. */
+.tc-recentre{display:none}
+#touchUI[data-gyro="1"] .tc-recentre{display:block}
+
+/* ============================ CONTROL SETTINGS ============================ */
+.tc-settings{position:fixed;z-index:90;inset:auto auto 0 0;
+  width:min(360px,92vw);max-height:min(86vh,560px);
+  margin:0 0 calc(8px + var(--safe-b)) calc(8px + var(--safe-l));
+  display:flex;flex-direction:column;
+  background:rgba(3,8,14,.94);border:1px solid var(--line);
+  backdrop-filter:blur(18px) saturate(.8);-webkit-backdrop-filter:blur(18px) saturate(.8);
+  clip-path:var(--slate,none);animation:pRise .32s cubic-bezier(.16,1,.3,1)}
+.tc-s-head{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 16px 12px;border-bottom:1px solid var(--line-s)}
+.tc-s-head h3{margin:0;font-size:11px;font-weight:400;letter-spacing:.34em;color:#e8f8ff}
+.tc-s-x{font-size:15px;color:var(--dim);padding:4px 8px}
+.tc-s-body{overflow-y:auto;padding:6px 16px 18px;touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.tc-s-row{display:flex;align-items:center;gap:12px;padding:11px 0;
+  border-bottom:1px solid var(--line-s);font-size:9.5px;letter-spacing:.18em;color:var(--dim)}
+.tc-s-row>span{flex:0 0 108px;color:rgba(186,214,230,.86)}
+.tc-s-row b{font-weight:400;font-size:10px;color:#dff4ff;min-width:34px;text-align:right}
+.tc-s-row input[type=range]{flex:1;min-width:0;height:26px;accent-color:var(--cy);background:none}
+/* A 20px checkbox is a 20px target on a device whose smallest reliable one is
+   about 44. The real input is hidden and the whole row is the hit area. */
+.tc-s-t{cursor:pointer}
+.tc-s-t input{position:absolute;opacity:0;pointer-events:none}
+.tc-s-t i{margin-left:auto;width:44px;height:24px;border:1px solid rgba(143,228,255,.28);
+  background:rgba(6,14,22,.6);position:relative;transition:.16s}
+.tc-s-t i::after{content:'';position:absolute;left:2px;top:2px;width:18px;height:18px;
+  background:rgba(143,228,255,.4);transition:.16s}
+.tc-s-t input:checked + i{border-color:var(--cy);background:rgba(143,228,255,.16)}
+.tc-s-t input:checked + i::after{left:22px;background:var(--cy);box-shadow:0 0 12px var(--cy)}
+.tc-s-seg>div{display:flex;gap:5px;margin-left:auto}
+.tc-s-seg button{padding:7px 10px;border:1px solid rgba(143,228,255,.22);
+  font-size:8.5px;letter-spacing:.14em;color:var(--dim);background:rgba(6,14,22,.5)}
+.tc-s-seg button.on{border-color:var(--cy);color:#dff4ff;background:rgba(143,228,255,.16)}
+.tc-s-note{padding:14px 0 4px;font-size:8.5px;letter-spacing:.1em;line-height:1.8;
+  color:rgba(160,196,214,.5)}
+.tc-s-reset{width:100%;margin-top:10px;padding:12px;border:1px solid rgba(255,107,94,.3);
+  font-size:9px;letter-spacing:.26em;color:rgba(255,140,128,.8);background:rgba(255,107,94,.05)}
+
+/* ============================ ROTATE NUDGE ============================ */
+#rotate{position:fixed;inset:auto 0 0 0;z-index:70;padding:14px 0 calc(18px + var(--safe-b));
+  display:none;flex-direction:column;align-items:center;gap:8px;
+  background:linear-gradient(0deg,rgba(2,6,11,.94),rgba(2,6,11,0));
+  font-size:9px;letter-spacing:.3em;color:var(--dim);pointer-events:none;
+  animation:fadeUp .6s ease both}
+#rotate.on{display:flex}
+.rot-p{fill:none;stroke:rgba(143,228,255,.55);stroke-width:2}
+.rot-a{fill:none;stroke:var(--am);stroke-width:2;stroke-linecap:round}
 
 /* ============================ PERF ============================ */
 #perf{position:fixed;left:6px;top:6px;z-index:120;font-size:9px;letter-spacing:.1em;
@@ -340,40 +505,32 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 
 /* portrait phone */
 @media (max-width:760px) and (orientation:portrait){
-  #touchBtns{right:calc(8px + var(--safe-r));gap:7px}
-  .tb{width:52px;height:32px;font-size:8.5px}
-  #touchThr{left:calc(8px + var(--safe-l));top:auto;bottom:calc(158px + var(--safe-b));
-    transform:none;flex-direction:row;gap:6px}
-  .tt{width:38px;height:34px;font-size:15px}
-  #log{bottom:calc(200px + var(--safe-b))}
-  #prompt{bottom:calc(24% + var(--safe-b))}
-  #narr{bottom:calc(52% + var(--safe-b));width:min(272px,68vw)}
-  .stick{width:104px;height:104px}
+  /* The controls own the bottom third in portrait, so the narrative stack has
+     to live above them rather than at its usual 4%. The rotate nudge sits at
+     the very bottom and is the only thing below the sticks. */
+  #narrStack{bottom:calc(42% + var(--safe-b));width:min(300px,74vw)}
+  #log{bottom:calc(46% + var(--safe-b))}
 }
 
-/* landscape phone */
+/* landscape phone — the Pixel 9a at 923x411 and the Fold's cover at 882x344.
+   Height is the scarce axis: the log moves to the top edge and the subtitle
+   stops halfway up, because everything below that belongs to two thumbs. */
 @media (max-height:520px){
-  #log{left:calc(120px + var(--safe-l));top:calc(12px + var(--safe-t));bottom:auto;
-    width:min(210px,30vw)}
+  #log{left:calc(96px + var(--safe-l));top:calc(10px + var(--safe-t));bottom:auto;
+    width:min(210px,28vw)}
   .lg{font-size:7.5px;letter-spacing:.08em;padding-left:6px}
-  #prompt{bottom:calc(20% + var(--safe-b))}
-  #narr{bottom:calc(50% + var(--safe-b));width:min(520px,58vw)}
-  #narrText{font-size:10.5px;line-height:1.6}
+  #narrStack{bottom:calc(34% + var(--safe-b))}
+  #narr{width:min(520px,54vw)}
+  #narrText{font-size:10.5px;line-height:1.6;padding:10px 20px}
   #reticle{width:66px;height:66px}
   .mk-lbl{font-size:7.5px}
   .mk-lbl em{display:none}
-  #markers{right:82px;width:calc(100% - 82px);overflow:hidden}
+  /* Markers are clipped away from the right edge because the action buttons
+     live there and a contact label under a button is unreadable and untappable
+     at the same time. */
+  #markers{right:96px;width:calc(100% - 96px);overflow:hidden}
   .fo-t{margin-top:-16vh;font-size:clamp(20px,4.2vw,30px)}
   .fo-s{margin-top:-16vh}
-  .stick{width:96px;height:96px;bottom:calc(14px + var(--safe-b))}
-  .stick i{width:38px;height:38px;margin:-19px 0 0 -19px}
-  #stickL{left:calc(14px + var(--safe-l))}
-  #stickR{right:calc(14px + var(--safe-r))}
-  #touchBtns{right:calc(10px + var(--safe-r));top:calc(10px + var(--safe-t));transform:none;gap:5px}
-  .tb{width:56px;height:26px;font-size:8px}
-  #touchThr{left:calc(10px + var(--safe-l));top:auto;bottom:calc(122px + var(--safe-b));
-    transform:none;flex-direction:row;gap:6px}
-  .tt{width:36px;height:32px;font-size:14px}
   .map-side{max-height:none;padding:10px 14px}
   .map-body{grid-template-columns:1fr 240px}
   .ms-row{padding:4px 0;font-size:9px}
@@ -383,12 +540,30 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
   .codex-main{padding:14px 16px 40px}
   .cx-text{font-size:11px;line-height:1.75}
   .p-head{padding:calc(8px + var(--safe-t)) 16px 8px 16px}
+  .tc-settings{max-height:calc(100vh - 16px);margin-bottom:calc(6px + var(--safe-b))}
 }
 
 @media (max-height:400px){
-  #narr{bottom:calc(54% + var(--safe-b))}
+  #narrStack{bottom:calc(38% + var(--safe-b))}
   #log{display:none}
 }
+
+/* The Fold unfolded: 1104x884, near square, and physically a small tablet.
+   Nothing here needs to shrink — the type wants to grow, because the panel is
+   held further from the face than a phone is. */
+@media (min-width:900px) and (max-width:1300px) and (min-height:700px) and (pointer:coarse){
+  #narrText{font-size:14px;line-height:2}
+  .cx-text{font-size:14px}
+  #log{width:300px;bottom:calc(20% + var(--safe-b))}
+  .lg{font-size:9.5px}
+}
+
+/* `touch-action:none` on the body is what stops a drag on the canopy from
+   scrolling the page and from firing Chrome's pull-to-refresh. It also stops
+   the archive from scrolling, which is the one thing in this game that is
+   supposed to. Grant it back, per axis, exactly where it is wanted. */
+.codex-main,.map-side{touch-action:pan-y;-webkit-overflow-scrolling:touch}
+.codex-nav{touch-action:pan-x}
 
 @media (hover:none){ #hints{display:none} }
 
@@ -426,11 +601,24 @@ button{font-family:inherit;color:inherit;background:none;border:none;cursor:poin
 }
 #hud.cine { opacity: 0; transition: opacity .35s ease; }
 
-/* ------------------------------------------------------- desktop-only gate */
-#boot.gate .boot-inner { max-width: 34rem; text-align: center; }
-#boot .boot-gate {
-  margin: 2.2rem 0 1.6rem;
-  font: 300 15px/1.85 var(--ui-font, ui-monospace, monospace);
-  letter-spacing: .06em;
-  color: #9fb2bf;
+/* The lost-context notice reuses the boot overlay. `.boot-gate` was the
+   desktop-only gate's paragraph and is now the one place the boot screen has
+   for a sentence of prose. */
+#boot .boot-gate{
+  margin:2.2rem 0 1.6rem;
+  font:300 15px/1.85 var(--mono);
+  letter-spacing:.06em;
+  color:#9fb2bf;
+}
+
+/* ------------------------------------------------------------- boot, touch
+   The WAKE button is a 13px-tall target on a desktop, which is fine for a
+   pointer and is under a third of the smallest reliable touch target. It is the
+   first thing anybody touches, and a first tap that misses reads as a game that
+   did not load. */
+@media (hover:none){
+  .boot-start{padding:20px 46px;font-size:12px}
+  .boot-title{font-size:clamp(17px,5.2vw,26px);letter-spacing:.3em;text-indent:.3em}
+  .boot-mark{margin-bottom:14px}
+  .boot-mark svg{width:78px;height:78px}
 }

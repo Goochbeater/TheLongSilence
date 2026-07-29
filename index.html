@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
 <meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+<!-- viewport-fit=cover puts the canvas under the cutout and the gesture bar; the
+     safe-area insets in style.css keep the controls out from under them.
+     interactive-widget=resizes-content stops Android's on-screen keyboard, which
+     nothing here summons but a password manager might, from resizing the visual
+     viewport out from under a running WebGL context. -->
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
 <meta name="theme-color" content="#000000" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
@@ -129,21 +134,21 @@
     </div>
   </div>
 
-  <!-- ====================== TOUCH ====================== -->
-  <div id="touchUI" class="hidden">
-    <div id="stickL" class="stick"><i></i></div>
-    <div id="stickR" class="stick"><i></i></div>
-    <div id="touchBtns">
-      <button class="tb" data-act="use">USE</button>
-      <button class="tb" data-act="boost">RUN</button>
-      <button class="tb" data-act="scan">SCAN</button>
-      <button class="tb" data-act="auto">AUTO</button>
-      <button class="tb" data-act="fold">FOLD</button>
-    </div>
-    <div id="touchThr">
-      <button class="tt" data-act="thrUp">+</button>
-      <button class="tt" data-act="thrDn">−</button>
-    </div>
+  <!-- ====================== TOUCH ======================
+       Empty on purpose. The control layer is contextual — the button set is a
+       function of what the crew is doing — so it builds its own contents from
+       one declaration in core/TouchControls.js rather than from markup here
+       that a second file then has to relabel and remap. -->
+  <div id="touchUI" class="hidden"></div>
+
+  <!-- Rotate nudge. Not a gate: portrait plays, it is just framed narrow. -->
+  <div id="rotate">
+    <svg viewBox="0 0 64 64" width="52" height="52" aria-hidden="true">
+      <rect x="22" y="8" width="20" height="34" rx="3" class="rot-p"/>
+      <path d="M12 46a22 22 0 0 0 40 0" class="rot-a"/>
+      <path d="M6 42l6 6 6-6" class="rot-a"/>
+    </svg>
+    <span>TURN SIDEWAYS</span>
   </div>
 
   <div id="perf"></div>

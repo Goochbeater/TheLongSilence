@@ -17,6 +17,26 @@
 /icon-512.png
   Cache-Control: public, max-age=86400
 
+# The cabin and the terrain textures are 6 MB of the payload and change roughly
+# never, but they are not fingerprinted, so a year would strand anyone who has
+# already loaded them. A week, revalidated: the service worker serves them
+# instantly from its own cache anyway and refreshes them behind the frame.
+/models/*
+  Cache-Control: public, max-age=604800, stale-while-revalidate=86400
+
+# The one file that must never be cached at the edge. The browser bypasses HTTP
+# caching for a service worker script itself, but a CDN sitting in front of it
+# does not, and an edge holding a stale worker holds every client on the build
+# that worker was stamped for.
+/sw.js
+  Cache-Control: no-cache
+  Service-Worker-Allowed: /
+
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
+  # Tilt-to-steer needs these on the top-level document. They are `self` by
+  # default; naming them keeps any embedded third party from inheriting motion
+  # sensors, and documents the requirement for anyone framing the game (an
+  # itch.io iframe needs allow="gyroscope; accelerometer; fullscreen").
+  Permissions-Policy: accelerometer=(self), gyroscope=(self), fullscreen=(self)

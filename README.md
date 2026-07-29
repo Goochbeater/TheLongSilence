@@ -29,15 +29,19 @@ little further. All seven opens the Aperture.
 |---|---|---|
 | Steer | mouse (click to capture) or arrow keys | left stick |
 | Roll | `Q` / `E` | right stick, horizontal |
-| Throttle | `W` / `S`, or scroll | right stick vertical, or `+` / `−` |
-| Boost | `Shift` | `BST` |
+| Throttle | `W` / `S`, or scroll | throttle rail, or right stick vertical |
+| Look around | hold RMB / `Alt` | `LOOK`, then right stick |
+| Boost | `Shift` | `BOOST` |
 | Scan | hold `F` | hold `SCAN` |
-| Land / lift off | `L` | — |
+| Land / lift off | `L` | `LAND` / `LIFT OFF` |
 | Fold drive | `J` | `FOLD` |
-| Star map | `M` | `MAP` |
+| Star map | `M` | `MAP`, then `◀ SYS` / `SYS ▶` and `FOLD TO` |
 | Archive | `Tab` | `ARC` |
-| Full stop | `X` | — |
-| Camera | `V` | — |
+| Autopilot | `G` | `AUTO` |
+| Cycle target | `T` | `TGT` |
+| Full stop | `X` | `STOP` |
+| Stand / sit | `E` | `STAND` / `USE` |
+| Camera | `V` | `VIEW` |
 | Frame stats | `P` | — |
 
 Fold speed scales with distance from the nearest mass, so an approach
@@ -77,8 +81,12 @@ attenuated wide mips → anamorphic streak → god rays and lens ghosts → comp
 (radial blur, chromatic aberration inside the sampler, AgX tonemap, grain,
 dither) → FXAA.
 
-**Performance** holds 60fps by trading resolution, never features: the engine
-watches frame time and moves the render scale between 0.62× and 2×.
+**Performance** holds the frame by trading resolution, never features: the
+engine watches frame time and moves the render scale between 0.62× and 2×. A
+handheld gets its own band — a floor of 0.45 and a target of 44–58fps rather
+than 60, because a 120Hz phone panel quantises the achievable rates to 120, 60,
+40, 30, and a controller chasing 60 on a scene that can hold 48 ratchets to the
+floor, sits there smeared, and still does not get 60.
 
 ---
 
@@ -86,7 +94,10 @@ watches frame time and moves the render scale between 0.62× and 2×.
 
 ```
 src/
-  core/       Engine (renderer, quality tiers, frame loop), Input
+  core/       Engine (renderer, quality tiers, frame loop), Input,
+              device (handheld/fold/posture detection, preferences),
+              TouchControls (the on-screen control layer)
+  sw.js       service worker; emitted to /sw.js, stamped by vite.config.js
   gfx/        PostFX, Sky (nebula cubemap + HDR star field), cube baking,
               greeble (the shared construction + surfacing kit), GLSL
   world/      generate (seeded universe), Planet, Star, Surface (the ground),
@@ -96,7 +107,8 @@ src/
               (cutscenes), encounters, lore
   ui/         HUD, Codex, StarMap, stylesheet
   audio/      procedural WebAudio drone and engine
-tools/        browser verification: survey.mjs, play.mjs, probe.mjs, sheet.mjs
+tools/        browser verification: survey.mjs, play.mjs, probe.mjs,
+              sheet.mjs, mobile.mjs
 ```
 
 **One kit builds everything.** `gfx/greeble.js` owns the plate-seam law, the
@@ -119,6 +131,63 @@ displaced by the same terrain law the orbital bake uses, bent down by the
 planet's real radius, and hazed by the same scattering coefficients as the
 atmosphere shell above it.
 
+## On a phone
+
+It used to refuse to run on one. The argument was that a handset cannot afford
+the raymarched atmospheres, the volumetric decks or the twenty-pass post chain,
+and that a reduced build would misrepresent the game — but the thing the dynamic
+resolution controller has always traded is *pixels*, and a Tensor G4 has more
+fill rate than the laptops this was prototyped on. A handheld now starts at the
+low tier at 0.85 device pixels with ambient occlusion and the cabin's shadow map
+off, and climbs from there. Every feature survives.
+
+What was genuinely wrong was the controls, so those were rebuilt for a
+touchscreen rather than adapted from a mouse — `src/core/TouchControls.js`.
+
+**The sticks float.** A fixed ring makes you look down to find it; a floating
+one puts its origin wherever your thumb lands inside a generous zone, so your
+eyes stay on the canopy. Past full deflection the origin follows the thumb
+instead of clamping, because a thumb pivots at the knuckle and arcs — clamping
+means the ship stays pinned at full pitch while your thumb is visibly moving.
+
+**The throttle is a lever, not two buttons.** `+`/`−` is a rate control
+pretending to be a setting: you cannot ask it for 40%, only hold until it looks
+about right, while watching a 9px number. The rail is absolute, with magnetic
+detents at the quarters.
+
+**The button set comes from the game's mode.** Flying, walking, landed, standing
+on a planet and reading the chart each get their own, and each button declares
+the action it fires. The previous version relabelled five fixed buttons and then
+remapped their meanings in two other files, which is how `SCAN` came to open the
+star map while you were standing up.
+
+Everything else: pointer events throughout, so the Fold's S Pen works and a
+thumb that slides off `SCAN` keeps holding it; haptics; a settings panel for
+size, opacity, sensitivity, left-handed layout and tilt-to-steer; and safe-area
+and hinge insets so nothing sits under a cutout, a gesture bar or a fold.
+
+Three layout classes, named for how much room a thumb has rather than for any
+device, and recomputed on every geometry change rather than latched at boot:
+
+| | | |
+|---|---|---|
+| `compact` | 923×411, 882×344 | Pixel 9a sideways, Z Fold 4 cover panel |
+| `roomy` | 1104×884 | Z Fold 4 unfolded — near square, bigger controls, pushed further out |
+| `portrait` | | playable, and nudges you to turn sideways |
+
+The Fold is the one that shapes the code. It swaps between two physically
+different screens *while the page is running*, and `innerWidth`/`innerHeight`
+during that swap are a blend of the old panel and the new one — measured
+884×1104 arriving as 884×344 for two frames, which is a different layout class
+entirely. So every geometry signal is debounced and re-measured across two
+animation frames before anything acts on it, the renderer holds its resize until
+the size stops moving, and anything mid-drag is dropped rather than left
+measuring against an origin that no longer exists.
+
+Install it and it runs without browser chrome, from cache — see
+[`docs/HOSTING.md`](docs/HOSTING.md), which also compares the deployment
+options and has the numbers behind them.
+
 ## Verification
 
 ```
@@ -128,6 +197,7 @@ node tools/probe.mjs "<js>" --shot out.png     # one expression, one frame
 node tools/sheet.mjs a.png b.png --out s.png   # contact sheet — judge a set at once
 node tools/levels.mjs shots/*.png              # tone statistics per frame
 node tools/judgeset.mjs                        # rebuild the review set in shots/judge/
+node tools/mobile.mjs                          # the four handset geometries, with touch
 ```
 
 `levels.mjs` is the one that stops arguments. "It looks flat" is not
@@ -140,8 +210,15 @@ finishes happily and screenshots the title card, with a plausible frame rate
 printed next to it. It verifies the overlay is actually gone and starts over if
 it is not, and the multi-shot tools re-check between shots.
 
-Phones are turned away at the door with a short message rather than served a
-reduced build — every feature worth looking at here is one a handset cannot
-afford, and a bad first impression is worse than none.
-
 Both drive a real headed Chromium with GPU rasterisation against `npm run dev`.
+
+`mobile.mjs` is the exception and runs against the *built* bundle by default
+reasoning, because every mobile bug in this layer has been a geometry bug — a
+button under the gesture bar, an aux column sitting on top of a stick's zone, a
+layout class latched during an unfold — and none of them are visible at
+1280×720 with a mouse. It emulates the two panels of a Fold 4 and both
+orientations of a Pixel 9a, drives the sticks and the rail with real pointer
+events, and asserts the ship responds; it also checks that no two controls
+overlap, that nothing is off screen, and that no touch target is under 40px.
+The frame rates it prints are software rasterisation and mean nothing about a
+handset.

@@ -2,14 +2,29 @@
   "name": "THE LONG SILENCE",
   "short_name": "Long Silence",
   "description": "Explore a procedurally generated galaxy from the cockpit of the deep survey vessel PALE SEEKER.",
+  "id": "/",
   "start_url": "/",
+  "scope": "/",
   "display": "fullscreen",
+  "display_override": ["fullscreen", "standalone", "minimal-ui"],
   "orientation": "any",
   "background_color": "#000000",
   "theme_color": "#05090e",
+  "categories": ["games", "entertainment"],
+  "prefer_related_applications": false,
+  "launch_handler": { "client_mode": "focus-existing" },
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "/og.jpg",
+      "sizes": "1200x630",
+      "type": "image/jpeg",
+      "form_factor": "wide",
+      "label": "The cockpit of the Pale Seeker, looking out at a blue world"
+    }
   ]
 }

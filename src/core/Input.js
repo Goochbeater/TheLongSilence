@@ -1,9 +1,16 @@
 import * as THREE from 'three';
+import { TouchControls } from './TouchControls.js';
+import { device, prefs } from './device.js';
 
 /* ============================================================================
-   Unified input: keyboard + mouse-as-stick, gamepad, and touch sticks.
+   Unified input: keyboard + mouse-as-stick, gamepad, and touch.
    Everything funnels into one normalised state object the flight model reads,
    so no downstream code cares which device is driving.
+
+   The touch half lives in TouchControls.js — it owns its own DOM, its own
+   layout and its own settings — and writes into the same `touchL` / `touchR` /
+   `touchBtn` fields this class has always exposed. What is left here is the
+   arbitration: which device is allowed to contribute to which axis, and when.
    ========================================================================== */
 
 const KEYMAP = {
@@ -32,9 +39,12 @@ export class Input {
     this.touchR = new THREE.Vector2();
     this.touchBtn = new Set();
     this.touchTapped = new Set();
-    this.invertY = false;
+    this.invertY = prefs.invertY;
     this.uiOpen = false;
-    this.lookSens = 1;
+    this.lookSens = prefs.lookSens;
+    // Set by the throttle rail while it is held; null the rest of the time, so
+    // the autopilot keeps the drive the moment the player lets go.
+    this.throttleSet = null;
     // raw pointer deltas, consumed once per frame by the first-person camera
     this._mdx = 0; this._mdy = 0;
 
@@ -84,71 +94,23 @@ export class Input {
     this._initTouch();
   }
 
+  /**
+   * Stand the touch layer up.
+   *
+   * `?touch=1` forces it on a desktop. That is not a debug nicety — it is the
+   * only way the layout and the contextual button sets get verified, since the
+   * capture tools drive a headless Chromium that reports a mouse. Pointer
+   * events mean the same code path serves both, so what is tested is what
+   * ships rather than a mouse-only fallback nailed on beside it.
+   */
   _initTouch() {
-    const coarse = window.matchMedia('(hover: none)').matches || 'ontouchstart' in window;
-    this.hasTouch = coarse;
+    const forced = new URLSearchParams(location.search).get('touch');
+    this.hasTouch = forced === '1' || (forced !== '0' && device.handheld);
+    this.controls = new TouchControls(this);
+    if (this.hasTouch) this.controls.mount();
 
-    const setup = (el, vec) => {
-      if (!el) return;
-      let id = null; const origin = new THREE.Vector2();
-      const knob = el.querySelector('i');
-      const R = 44;
-      const start = (e) => {
-        const t = e.changedTouches[0];
-        id = t.identifier;
-        const r = el.getBoundingClientRect();
-        origin.set(r.left + r.width / 2, r.top + r.height / 2);
-        el.classList.add('act');
-        this.touch = true;
-        move(e);
-      };
-      const move = (e) => {
-        for (const t of e.changedTouches) {
-          if (t.identifier !== id) continue;
-          let dx = (t.clientX - origin.x) / R;
-          let dy = (t.clientY - origin.y) / R;
-          const l = Math.hypot(dx, dy);
-          if (l > 1) { dx /= l; dy /= l; }
-          vec.set(dx, dy);
-          if (knob) knob.style.transform = `translate(${dx * R}px, ${dy * R}px)`;
-        }
-        e.preventDefault();
-      };
-      const end = (e) => {
-        for (const t of e.changedTouches) {
-          if (t.identifier !== id) continue;
-          id = null; vec.set(0, 0);
-          el.classList.remove('act');
-          if (knob) knob.style.transform = '';
-        }
-      };
-      el.addEventListener('touchstart', start, { passive: false });
-      el.addEventListener('touchmove', move, { passive: false });
-      el.addEventListener('touchend', end);
-      el.addEventListener('touchcancel', end);
-    };
-
-    setup(document.getElementById('stickL'), this.touchL);
-    setup(document.getElementById('stickR'), this.touchR);
-
-    document.querySelectorAll('#touchBtns .tb, #touchThr .tt').forEach((b) => {
-      const act = b.dataset.act;
-      b.addEventListener('touchstart', (e) => {
-        this.touch = true;
-        this.touchBtn.add(act); this.touchTapped.add(act);
-        b.classList.add('on'); e.preventDefault();
-      }, { passive: false });
-      const off = () => { this.touchBtn.delete(act); b.classList.remove('on'); };
-      b.addEventListener('touchend', off);
-      b.addEventListener('touchcancel', off);
-      // mouse fallback so the touch UI is testable on desktop
-      b.addEventListener('mousedown', (e) => {
-        this.touchBtn.add(act); this.touchTapped.add(act); b.classList.add('on'); e.preventDefault();
-      });
-      b.addEventListener('mouseup', off);
-      b.addEventListener('mouseleave', off);
-    });
-
+    // A stray tap anywhere still counts as "this player is on a touchscreen",
+    // which is what switches the on-screen prompts from key caps to labels.
     window.addEventListener('touchstart', () => { this.touch = true; }, { once: true, passive: true });
   }
 
@@ -202,11 +164,16 @@ export class Input {
     yaw += (k('yawL') - k('yawR')) * 0.9;
     roll += (k('rollL') - k('rollR'));
 
-    // ---- touch sticks
+    /* ---- touch sticks
+       Left is always the ship's attitude. Right is roll and throttle *unless*
+       it has been handed to the head — on foot always, and at the helm while
+       LOOK is lit. Reading it for both at once is how the old layer let a
+       glance out of the side window roll the ship ninety degrees. */
+    const rightIsLook = this.controls ? this.controls.rightIsLook : false;
     if (this.touch) {
-      pitch += -this.touchL.y;
+      pitch += -this.touchL.y * (this.invertY ? -1 : 1);
       yaw += -this.touchL.x;
-      roll += this.touchR.x;
+      if (!rightIsLook) roll += this.touchR.x;
     }
 
     // ---- gamepad
@@ -230,14 +197,25 @@ export class Input {
     s.boost = this.held('boost') ? 1 : 0;
 
     let td = k('thrUp') - k('thrDn');
-    if (this.touch) td += -this.touchR.y;
+    if (this.touch && !rightIsLook) td += -this.touchR.y;
     if (this.touchBtn.has('thrUp')) td += 1;
     if (this.touchBtn.has('thrDn')) td -= 1;
     td += gpThrottle;
     const w = this.wheel();
     s.throttleDelta = td + (-w * 6);
 
+    /* The rail is a lever: while a thumb is on it, its position *is* the
+       throttle, and the rate control above is ignored for that frame. Handing
+       an absolute value up rather than converting it to a delta here matters,
+       because a delta large enough to cover the whole range in one frame would
+       be clamped by the same integrator the autopilot shares. */
+    this.throttleSet = this.controls ? this.controls.throttleSet : null;
+
     s.strafeY = k('up') - k('down');
     s.strafeX = 0;
+
+    // Gyro contribution and the head-look accumulator, last, so both see the
+    // final stick values.
+    if (this.controls) this.controls.applyTo(s, dt);
   }
 }

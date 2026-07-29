@@ -539,6 +539,33 @@ export class HoloMap {
 
   close() { this.open = false; this.game.audio?.ping('ui'); }
 
+  /**
+   * Step the selection one system, ordered outward from the one you are in.
+   *
+   * The chart is aimed by gaze, and gaze needs a head that can turn — which is
+   * true in the seat and not true through a touchscreen, where the camera has
+   * already eased onto a fixed pose over the nav table by the time the chart is
+   * legible. Two buttons that walk the list are not a lesser version of that:
+   * fold cost is distance, so "the next one out" is the order a navigator
+   * actually thinks in, and it is the same order on every device.
+   */
+  step(dir) {
+    const g = this.game;
+    const cur = g.galaxy[g.currentSystemId];
+    if (!cur) return;
+    const order = g.galaxy
+      .map((s, i) => ({ i, d: Math.hypot(s.x - cur.x, s.y - cur.y) }))
+      .sort((a, b) => a.d - b.d)
+      .map((o) => o.i);
+    const at = Math.max(0, order.indexOf(this.sel));
+    // Wrap. Fourteen systems is a short enough list that running off the end
+    // and stopping reads as the button having broken.
+    const next = order[(at + dir + order.length) % order.length];
+    if (next === this.sel) return;
+    this.sel = next;
+    g.audio?.ping('switch');
+  }
+
   cameraPose(out) {
     // Nearly level with the volume, so it reads as something floating rather
     // than a pattern lying on the table top. Aimed at the middle of the volume

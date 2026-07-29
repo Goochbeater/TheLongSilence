@@ -746,20 +746,57 @@ export class Game {
        scene — happens on the far side of a shot boundary, and stopping the
        director half way through leaves the game in a state with no name. */
     if (this.director.active && !this.transition
-        && (input.tappedCode('Escape') || input.tappedCode('Space') || input.tapped('use'))) {
+        && (input.tappedCode('Escape') || input.tappedCode('Space')
+          || input.tapped('use') || input.tapped('skip'))) {
       this.director.stop();
     }
-    if (input.tappedCode('Escape')) { this.starmap.close(); this.codex.close(); }
+    if (input.tappedCode('Escape') || input.tapped('close')) { this.starmap.close(); this.codex.close(); }
     if (input.tappedCode('KeyP')) document.getElementById('perf').classList.toggle('on');
     // The stations are how you *discover* these; the shortcuts are for players
     // who already know where they live.
-    if (input.tappedCode('KeyM')) { this.starmap.toggle(); this.audio.ping('ui'); }
-    if (this.starmap.open && input.tappedCode('KeyJ')) { this.starmap.confirm(); return; }
-    if (input.tappedCode('Tab')) { this.codex.toggle(); this.audio.ping('ui'); }
+    if (input.tappedCode('KeyM') || input.tapped('map')) { this.starmap.toggle(); this.audio.ping('ui'); }
+    if (input.tappedCode('Tab') || input.tapped('archive')) { this.codex.toggle(); this.audio.ping('ui'); }
 
     const uiOpen = this.starmap.open || this.codex.open;
     input.uiOpen = uiOpen;
     if (uiOpen && document.pointerLockElement) document.exitPointerLock();
+
+    /* -------------------------------------------------- touch control layer
+       The button set is a function of what the crew is doing, and it is set
+       from here rather than guessed at inside the control layer — the layer
+       should not have opinions about game state, and the game already knows.
+       One frame of latency on a conditional button appearing is invisible;
+       a control layer with its own copy of the mode logic is not. */
+    const tc = input.controls;
+    if (tc && tc._built) {
+      const skippable = this.director.active && !this.transition;
+      const ctx = skippable ? 'cine'
+        : uiOpen ? (this.starmap.open ? 'map' : 'codex')
+          : this.landed ? (this.landed.onFoot ? 'ground' : 'landed')
+            : this.mode === 'walk' ? 'walk' : 'flight';
+      tc.setContext(ctx, this);
+      /* A sequence owns the frame, so the controls go — except for the one
+         button that ends it, which is why 'cine' is a context rather than a
+         reason to hide the layer. A transition is not skippable at all
+         (see above), and the archive is a full-screen panel with its own
+         close button. */
+      tc.setVisible(ctx !== 'codex' && !this.transition);
+      tc.showThrottle(ship.throttle);
+    }
+
+    /* The chart is aimed with the head, so it is the one panel where "a UI is
+       open" must not mean "input is suspended". J confirms on a keyboard; on a
+       touchscreen the selection steps with two buttons, because a fixed camera
+       pose leaves gaze picking nothing to move. */
+    if (this.starmap.open) {
+      if (tc) {
+        const t = tc.consumeLook();
+        if (t.x || t.y) this.player.look(t.x, t.y, input.lookSens);
+      }
+      if (input.tapped('prev')) { this.starmap.step(-1); }
+      if (input.tapped('next')) { this.starmap.step(1); }
+      if (input.tappedCode('KeyJ') || input.tapped('jump')) { this.starmap.confirm(); return; }
+    }
 
     // ------------------------------------------------------------ orbits
     this._positionSystem(dt);
@@ -768,7 +805,12 @@ export class Game {
     // On foot the mouse turns your head. At the helm it flies the ship, and
     // holding LOOK (right mouse / Alt) hands the head back to you — the
     // convention every cockpit sim settles on.
-    const freeLook = input.held('look') || input.rmb === true;
+    /* LOOK on the touch layer is a latch, not a held button — there is no third
+       thumb to hold one with — so it has to feed the same free-look flag the
+       right mouse button does, or the seat springs the head back to centre on
+       the very next frame and the stick appears to do nothing. */
+    const freeLook = input.held('look') || input.rmb === true
+      || (input.controls ? input.controls.lookMode : false);
     this.freeLook = freeLook;
     if (!uiOpen) {
       const md = input.consumeMouse();
@@ -778,9 +820,15 @@ export class Game {
       } else {
         input.feedStick(md.x, md.y);
       }
-      if (input.touch) {
-        if (onFoot) this.player.look(input.touchR.x * 10, input.touchR.y * 10, 1);
-        else if (freeLook) this.player.look(input.touchR.x * 8, input.touchR.y * 8, 1);
+      /* The touch stick's head-look is accumulated in the control layer against
+         real elapsed time and drained here, in the same place and the same
+         units as the mouse delta. The old version multiplied the stick's
+         *position* by a constant every frame, which made the look speed a
+         function of the frame rate — twice as fast on the Fold as on the same
+         scene rendering at thirty. */
+      if (input.controls) {
+        const t = input.controls.consumeLook();
+        if (t.x || t.y) this.player.look(t.x, t.y, input.lookSens);
       }
     }
     this.player.autoHead = this.mode === 'pilot' ? ship.angVel : null;
@@ -795,7 +843,7 @@ export class Game {
           && (input.tappedCode('KeyE') || input.tapped('use'))) {
         if (this.landed.onFoot) this.board(); else this.disembark();
       }
-      if (input.tappedCode('KeyL') && !this.transition) this.liftOff();
+      if ((input.tappedCode('KeyL') || input.tapped('liftoff')) && !this.transition) this.liftOff();
       // The crew controller runs on the ground too — the main update returns
       // before reaching it, so it has to be driven from here.
       if (this.landed && this.landed.onFoot) this.player.update(dt, input, uiOpen);
@@ -833,15 +881,13 @@ export class Game {
        was no way to reach the exterior camera except a touch button, and coming
        back from it landed on 'pilot' whether or not anybody was in the seat —
        which the next two lines then undid, one frame later, silently. */
-    if (!uiOpen && input.tappedCode('KeyV')) this.toggleView();
-
-    // On foot the action buttons are relabelled (MAP / ARC / VIEW), so the
-    // touch actions behind them have to be remapped to match what they say.
-    if (this.mode === 'walk' && !uiOpen) {
-      if (input.tapped('scan')) { this.starmap.toggle(); this.audio.ping('ui'); }
-      if (input.tapped('auto')) { this.codex.toggle(); this.audio.ping('ui'); }
-      if (input.tapped('fold')) this.toggleView();
-    }
+    /* One name per action, everywhere.
+       The touch buttons used to be five fixed keys whose labels changed with
+       the mode and whose *meanings* were then patched back up here, in two
+       places — which is exactly how SCAN came to open the star map while you
+       were standing up. Buttons now declare the action they fire and this
+       reads that action, so there is nothing left to keep in sync. */
+    if (!uiOpen && (input.tappedCode('KeyV') || input.tapped('view'))) this.toggleView();
 
     // ------------------------------------------------------------ flight
     const flying = (this.mode === 'pilot' || this.mode === 'exterior') && !this.transition;
@@ -850,9 +896,19 @@ export class Game {
       if (input.tapped('fold') || input.tapped('foldBtn')) this.toggleFold();
       if (input.tapped('target')) this.cycleTarget();
       if (input.tappedCode('KeyG') || input.tapped('auto')) this.toggleAutopilot();
-      if (input.tappedCode('KeyL')) this.land();
+      if (input.tappedCode('KeyL') || input.tapped('land')) this.land();
 
-      ship.throttle = THREE.MathUtils.clamp(ship.throttle + input.state.throttleDelta * dt * 0.9, 0, 1);
+      /* The throttle rail is absolute: while a thumb is on it its position is
+         the setting, full stop. Running it through the integrator below would
+         make the lever a rate control with a lag, which is the one thing a
+         lever must not be — you would push it to the stop and watch the number
+         crawl. Letting go returns the drive to the autopilot and to the keys. */
+      if (input.throttleSet !== null) {
+        ship.throttle = THREE.MathUtils.clamp(input.throttleSet, 0, 1);
+        if (input.throttleSet > 0.001) this.cancelAutopilot();
+      } else {
+        ship.throttle = THREE.MathUtils.clamp(ship.throttle + input.state.throttleDelta * dt * 0.9, 0, 1);
+      }
       ship.boost += ((input.state.boost && !ship.foldMode ? 1 : 0) - ship.boost) * Math.min(1, dt * 5);
     } else {
       input.state.pitch = input.state.yaw = input.state.roll = 0;
