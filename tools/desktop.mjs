@@ -50,17 +50,19 @@ page.on('console', (m) => { if (m.type() === 'error') errs.push(m.text()); });
 
 await page.goto(URL, { waitUntil: 'domcontentloaded' });
 
-/* Booted here rather than through boot.mjs, on purpose.
+/* Booted here rather than through boot.mjs, and given far more room than it.
  *
  * boot.mjs exists to survive the dev server hot-reloading a capture out from
- * under itself, and pays for that with a ninety-second budget and four retries.
- * This tool runs against the built bundle, where there is no hot reload to
- * survive — and the desktop tier is the one configuration that does not fit in
- * ninety seconds when there is no GPU: it bakes its sky at 1024 and renders at
- * up to 2.8x device pixels, where a handheld bakes at 256 and renders at 0.85x.
- * Measured on a software rasteriser, WAKE appears between 45 and 90 seconds and
- * the boot is otherwise completely clean. Retrying that is not resilience, it
- * is four consecutive timeouts; waiting longer once is the honest answer.
+ * under itself. This tool runs against the built bundle, so there is no hot
+ * reload to survive and nothing for its retry loop to do.
+ *
+ * The budget is the real reason. Every other tool boots either the handheld
+ * tier or a machine with a GPU; this one boots the desktop tier without one,
+ * which bakes its sky at 1024 and renders at up to 2.8x device pixels against a
+ * handheld's 256 and 0.85x. Sampled on a software rasteriser: "charting the
+ * first system" at 15s, "warming shaders" at 45s, WAKE up by 90s, no console
+ * errors anywhere. That lands right on boot.mjs's ninety and would be a coin
+ * toss on a busier machine. Five minutes costs nothing when it is not needed.
  */
 await page.waitForFunction(
   () => { const b = document.getElementById('bootStart'); return b && !b.hidden; },
