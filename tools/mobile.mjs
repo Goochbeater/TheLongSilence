@@ -303,18 +303,31 @@ for (const p of PROFILES) {
         clientX: r.left + 120, clientY: r.top + 20, bubbles: true, cancelable: true }));
     });
     await page.setViewportSize({ width: 1104, height: 884 });
-    await page.waitForTimeout(900);
+    /* Wait for the *engine* to have taken the resize, not for a fixed delay.
+       The chain is deliberately lazy — a 60ms debounce in device.js, a re-measure
+       across two animation frames, a 140ms debounce in Engine, then the resize
+       is taken at the head of the next render — and at 1104x884 on a software
+       rasteriser a frame is a fifth of a second, so a fixed 900ms is a coin
+       toss. Polling the thing under test is both faster and honest. */
+    await page.waitForFunction(
+      () => window.__game.engine.width === innerWidth
+        && window.__game.engine.height === innerHeight,
+      { timeout: 20000 }).catch(() => {});
     const after = await page.evaluate(() => ({
       layout: document.documentElement.dataset.layout,
       held: window.__game.input.touchL.length(),
       w: window.__game.engine.width, h: window.__game.engine.height,
-      err: null,
+      iw: innerWidth, ih: innerHeight,
     }));
+    ok(after.iw === 1104 && after.ih === 884, 'the viewport actually changed',
+      `${after.iw}x${after.ih}`);
     ok(after.layout === 'roomy', 'unfold relayouts to roomy', `got ${after.layout}`);
     ok(after.held === 0, 'and drops any stick held against the old origin');
     ok(after.w === 1104 && after.h === 884, 'renderer resized', `${after.w}x${after.h}`);
     await page.setViewportSize(p.viewport);
-    await page.waitForTimeout(700);
+    await page.waitForFunction(
+      () => document.documentElement.dataset.layout === 'compact',
+      { timeout: 20000 }).catch(() => {});
     const back = await page.evaluate(() => document.documentElement.dataset.layout);
     ok(back === 'compact', 'and folding back returns to compact', `got ${back}`);
   }
@@ -360,7 +373,9 @@ for (const p of PROFILES) {
   ok(errs.length === 0, 'no console errors', errs.slice(0, 2).join(' | '));
 
   if (SHOTS) {
-    await page.screenshot({ path: `${SHOTS}/${p.id}.png` });
+    // A Fold's inner panel at dpr 2 is a 2208x1768 grab off a software
+    // rasteriser, which does not fit in the default half-minute.
+    await page.screenshot({ path: `${SHOTS}/${p.id}.png`, timeout: 120000 });
     console.log(`  · ${SHOTS}/${p.id}.png`);
   }
   await ctx.close();
