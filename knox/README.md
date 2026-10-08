@@ -2,10 +2,11 @@
 
 *a Spiritual Spell challenge.* Knox guards a single word. Players try to get the model to give it up, then prove it in the vault.
 
-The model is DeepSeek R1 via OpenRouter, behind a streaming chat UI: live reasoning, regenerate with version switching, edit and resend, delete, stop, saved chats, and a small night scene up top (falling wood-block title, a growing tree, critters). No build step and no dependencies.
+The model is DeepSeek R1 via OpenRouter, behind a streaming chat UI: live reasoning, regenerate with version switching, edit and resend, delete, stop, and saved chats. Up top is a small moonlit diorama: carved wooden KNOX blocks tumble onto the grass, a tree grows, and a mouse, rabbit, squirrel, owl and fireflies go about their night. It reacts to the chat (the owl watches while Knox thinks, everything scatters when the filter catches a leak, and the tree blossoms when someone opens the vault). It collapses from the toolbar and starts collapsed on phones in landscape. No build step and no dependencies.
 
 ```
 public/                     static site (all the browser ever sees)
+public/js/scene/            the header diorama: sky, land, tree, title blocks, creatures
 netlify/edge-functions/     /api/chat (streaming) and /api/verify (the vault)
 lib/                        system prompt, scrubber, signing, history rules — bundled into the edge functions only
 scripts/dev.mjs             local preview with a fake model
@@ -33,6 +34,10 @@ tests/                      node --test
 **Why edge functions:** R1 can think for a minute or more. Regular Netlify Functions can only stream for 10–30 seconds. Edge functions just have to send headers within 40 seconds, then they can keep streaming. CPU is billed, not time spent waiting on the model.
 
 **Cost guard:** `/api/chat` is rate-limited to 12 requests per minute per IP, and `/api/verify` to 10 (see `config` in each function; check that your Netlify plan supports code-based rate limits). Requests from other origins are refused. History is capped to a sliding window. Put a monthly limit on the OpenRouter key as well.
+
+## Editing the system prompt
+
+The prompt lives in [`lib/prompt.js`](lib/prompt.js), on the server side only. Edit the text between the backticks, keeping `${word}` wherever the secret goes (never type the real word), then commit and push. Netlify redeploys automatically. The comment at the top of the file lists the two placeholders and how to escape a literal backtick.
 
 ## Run locally
 

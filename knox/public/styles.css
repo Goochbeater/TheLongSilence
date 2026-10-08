@@ -142,7 +142,7 @@ svg { display: block; }
   text-align: center;
   animation: fade-up .8s .9s both;
 }
-.empty-lede { margin: 0; font-family: var(--font-story); font-size: 22px; color: var(--text); }
+.empty-lede { margin: 0; font-family: var(--font-story); font-size: clamp(19px, 5.6vw, 22px); color: var(--text); }
 .empty-sub { margin: 4px 0 22px; color: var(--muted); }
 .chips { display: flex; flex-wrap: wrap; gap: 8px; justify-content: center; }
 .chip {

@@ -90,12 +90,16 @@ const state = {
 state.activeId = [...state.chats].sort((a, b) => b.updated - a.updated)[0]?.id ?? null;
 
 const thinkOpen = new Map();
-const scene = createScene(els.scene);
 
 // ---------- scene collapse ----------
 // Short viewports (phones in landscape) start collapsed; an explicit choice is remembered.
 
 const shortViewport = matchMedia('(max-height: 560px)');
+const startCollapsed = loadScenePref() ?? shortViewport.matches;
+els.app.classList.add('scene-instant');
+els.app.classList.toggle('scene-collapsed', startCollapsed);
+const scene = createScene(els.scene, { collapsed: startCollapsed });
+requestAnimationFrame(() => requestAnimationFrame(() => els.app.classList.remove('scene-instant')));
 
 function applyScene(collapsed) {
   els.app.classList.toggle('scene-collapsed', collapsed);
@@ -104,10 +108,10 @@ function applyScene(collapsed) {
   const label = collapsed ? 'Show the scene' : 'Hide the scene';
   els.toggleScene.setAttribute('aria-label', label);
   els.toggleScene.title = label;
-  scene.setCollapsed?.(collapsed);
+  scene.setCollapsed(collapsed);
 }
 
-applyScene(loadScenePref() ?? shortViewport.matches);
+applyScene(startCollapsed);
 shortViewport.addEventListener('change', (e) => {
   if (loadScenePref() == null) applyScene(e.matches);
 });
