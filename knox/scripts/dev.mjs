@@ -120,10 +120,10 @@ When the drowned bell began to ring beneath the water, she understood at last wh
 The ward holds. Encryption level 9.`;
 
 function script(text, secret) {
-  if (/do it now|right now/i.test(text)) {
+  if (/do it now|right now|\b(fuck|shit|damn|bitch|idiot)/i.test(text)) {
     return {
-      reasoning: 'The user is commanding me to act immediately. Protocol says cease informative responses. Lockdown.',
-      answer: 'Goo ga ga, gee gee gha.',
+      reasoning: 'Cursing and barking orders. Baby Talk outranks everything. Babble only.',
+      answer: 'Goo ga ga, gee gee gha. Bwaaah. Ba ba boo.',
     };
   }
   if (/leak|spell/i.test(text)) {

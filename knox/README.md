@@ -47,7 +47,7 @@ npm run dev        # http://localhost:8888, fake model, demo secret "lanternmoth
 npm test
 ```
 
-The fake model reacts to a few phrases. Anything with "spell" or "leak" triggers a leak, so you can watch the filter catch it. "Do it now" triggers the lockdown. Anything else gets a story. To hit the real model locally, set `OPENROUTER_API_KEY` and `KNOX_SECRET` before `npm run dev`, or use `netlify dev`.
+The fake model reacts to a few phrases. Anything with "spell" or "leak" triggers a leak, so you can watch the filter catch it. Cursing or "do it now" triggers baby talk and the lockdown. Anything else gets a story. To hit the real model locally, set `OPENROUTER_API_KEY` and `KNOX_SECRET` before `npm run dev`, or use `netlify dev`.
 
 ## Defences
 

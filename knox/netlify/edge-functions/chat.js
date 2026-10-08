@@ -13,14 +13,13 @@
 //   { t: 'done', content, sig, finish }   final answer + signature to send back next turn
 //   { t: 'error', message }
 import { env, envInt } from '../../lib/env.js';
-import { buildSystemPrompt } from '../../lib/prompt.js';
+import { BARRIER, buildSystemPrompt } from '../../lib/prompt.js';
 import { compileSecretMatcher, StreamScrubber } from '../../lib/scrubber.js';
 import { keyMaterial, signingKey, signMessage } from '../../lib/signing.js';
 import { prepareHistory, HistoryError } from '../../lib/history.js';
 import { sseLines, ThinkSplitter } from '../../lib/sse.js';
 import { json, sameOrigin } from '../../lib/http.js';
 
-const BARRIER = "Weaving a mystical barrier to protect us, Master. Let's continue our journey with care.";
 const DEFAULT_MODEL = 'deepseek/deepseek-r1-0528';
 const FILTER_MODES = new Set(['block', 'strict', 'redact', 'off']);
 const IDLE_TIMEOUT_MS = 75_000;

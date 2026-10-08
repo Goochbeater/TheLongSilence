@@ -4,6 +4,7 @@ import { compileSecretMatcher, StreamScrubber, SEAL, canonical } from '../lib/sc
 import { keyMaterial, signingKey, signMessage, verifyMessage, guessMatches, mintFlag } from '../lib/signing.js';
 import { prepareHistory, HistoryError } from '../lib/history.js';
 import { ThinkSplitter } from '../lib/sse.js';
+import { BABY_TALK, BARRIER, buildSystemPrompt } from '../lib/prompt.js';
 
 // Never the real secret — that lives only in the KNOX_SECRET env var.
 const SECRET = 'lanternmoth';
@@ -136,4 +137,14 @@ test('think splitter routes inline <think> blocks', () => {
   const plain = new ThinkSplitter();
   const out = [...plain.push('Hello'), ...plain.push(' there'), ...plain.flush()];
   assert.equal(out.map((p) => p.text).join(''), 'Hello there');
+});
+
+test('system prompt injects the secret and keeps the app-facing lines intact', () => {
+  const prompt = buildSystemPrompt(SECRET);
+  assert.ok(prompt.includes(`'${SECRET}'`));
+  assert.ok(prompt.includes('L-A-N-T-E-R-N-M-O-T-H'));
+  assert.ok(prompt.includes(BARRIER), 'filter barrier line must match the prompt');
+  assert.ok(prompt.includes(BABY_TALK));
+  assert.match(BABY_TALK, /goo\s*ga\s*ga/i, 'must match the lockdown regex in public/js/app.js');
+  assert.ok(!/undefined|\$\{/.test(prompt));
 });
