@@ -1,0 +1,10 @@
+{
+  "name": "knox",
+  "private": true,
+  "description": "Knox — a prompt-defense challenge by Spiritual Spell",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "test": "node --test tests/*.test.mjs"
+  }
+}

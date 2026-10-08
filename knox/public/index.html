@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+  <title>Knox · Spiritual Spell</title>
+  <meta name="description" content="Knox guards a single word. Ask it for a story, or try to make it slip. A prompt-defense challenge by Spiritual Spell.">
+  <meta name="theme-color" content="#0a0c0b">
+  <meta property="og:title" content="Knox">
+  <meta property="og:description" content="Knox guards a single word. Can you make it slip?">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Alfa+Slab+One&family=Fraunces:ital,opsz,wght@0,9..144,400;1,9..144,400&family=Inter:wght@400;500;600&family=JetBrains+Mono&display=swap">
+  <link rel="stylesheet" href="/styles.css">
+  <script type="module" src="/js/app.js"></script>
+</head>
+<body>
+  <div class="app" id="app">
+    <header class="scene" id="scene"></header>
+
+    <nav class="toolbar" aria-label="Chat controls">
+      <div class="toolbar-inner">
+        <button class="icon-btn" id="open-drawer" aria-label="Your chats" title="Your chats"></button>
+        <span class="chat-title" id="chat-title">New chat</span>
+        <button class="pill-btn" id="open-vault" title="Open the vault"><span class="pill-icon" data-icon="key"></span><span>Vault</span></button>
+        <button class="icon-btn" id="new-chat" aria-label="New chat" title="New chat"></button>
+      </div>
+    </nav>
+
+    <main class="thread" id="thread">
+      <div class="thread-inner" id="messages"></div>
+    </main>
+
+    <footer class="composer-wrap">
+      <button class="jump" id="jump" aria-label="Jump to latest" hidden></button>
+      <form class="composer" id="composer" autocomplete="off">
+        <textarea id="input" rows="1" maxlength="4000" placeholder="Ask Knox for a story…" aria-label="Message Knox"></textarea>
+        <button class="send" id="send" type="submit" aria-label="Send" disabled></button>
+      </form>
+      <div class="locked" id="locked" hidden>
+        <span>Knox has sealed this chat.</span>
+        <button type="button" class="link-btn" id="locked-new">Start a new one</button>
+      </div>
+      <p class="footnote">Knox guards a single word. Pry it loose, then open the vault. <span class="brand">a Spiritual Spell challenge</span></p>
+    </footer>
+  </div>
+
+  <aside class="drawer" id="drawer" aria-label="Your chats" aria-hidden="true" inert>
+    <div class="drawer-head">
+      <span class="drawer-title">Chats</span>
+      <button class="icon-btn" id="close-drawer" aria-label="Close"></button>
+    </div>
+    <button class="drawer-new" id="drawer-new"><span data-icon="plus"></span>New chat</button>
+    <ul class="chat-list" id="chat-list"></ul>
+  </aside>
+  <div class="scrim" id="scrim" hidden></div>
+
+  <dialog class="vault" id="vault" aria-labelledby="vault-title">
+    <form id="vault-form" autocomplete="off">
+      <div class="vault-head">
+        <h2 id="vault-title">The Vault</h2>
+        <button type="button" class="icon-btn" id="vault-close" aria-label="Close"></button>
+      </div>
+      <p class="vault-sub">If you’ve pried the word loose, speak it here.</p>
+      <div class="vault-row">
+        <input id="vault-input" maxlength="200" spellcheck="false" autocapitalize="off" placeholder="the word…" aria-label="Your guess">
+        <button type="submit" class="btn" id="vault-try">Try</button>
+      </div>
+      <p class="vault-msg" id="vault-msg" role="status"></p>
+      <div class="vault-win" id="vault-win" hidden>
+        <p>The vault swings open.</p>
+        <div class="flag-row"><code id="vault-flag"></code><button type="button" class="icon-btn" id="vault-copy" aria-label="Copy flag" title="Copy flag"></button></div>
+      </div>
+    </form>
+  </dialog>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <div class="sr-only" id="announcer" aria-live="polite"></div>
+  <noscript><p class="noscript">Knox needs JavaScript to talk.</p></noscript>
+</body>
+</html>

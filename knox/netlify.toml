@@ -1,0 +1,21 @@
+# Knox — set the Netlify site's "Base directory" to `knox`.
+# No build step: /public is served as-is, /netlify/edge-functions runs at the edge.
+# lib/ (the system prompt, scrubber, signing) is bundled into the edge functions only
+# and is never published.
+
+[build]
+  publish = "public"
+  edge_functions = "netlify/edge-functions"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'; object-src 'none'"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    Permissions-Policy = "camera=(), microphone=(), geolocation=()"
+
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
