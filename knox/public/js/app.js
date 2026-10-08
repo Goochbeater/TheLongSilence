@@ -22,7 +22,7 @@ const ICONS = {
   tree: '<svg viewBox="0 0 24 24"><path d="M12 20.5v-6.5"/><path d="M12 14c-3.6 0-6.2-2.3-6.2-5.4C5.8 5.5 8.6 3 12 3s6.2 2.5 6.2 5.6c0 3.1-2.6 5.4-6.2 5.4z"/><path d="M8.5 20.5h7"/></svg>',
 };
 
-const LOCKDOWN = /goo\s*ga\s*ga/i;
+const BABY_TALK = /goo\s*ga\s*ga/i;
 const WRONG = [
   'The lock doesn’t turn.',
   'Cold iron. Not that.',
@@ -47,8 +47,6 @@ const els = {
   composer: $('composer'),
   input: $('input'),
   send: $('send'),
-  locked: $('locked'),
-  lockedNew: $('locked-new'),
   jump: $('jump'),
   chatTitle: $('chat-title'),
   openDrawer: $('open-drawer'),
@@ -239,7 +237,7 @@ function renderThread() {
   const frag = document.createDocumentFragment();
   chat.messages.forEach((m, i) => frag.append(messageNode(chat, m, i === chat.messages.length - 1)));
   const last = chat.messages[chat.messages.length - 1];
-  if (last.role === 'user' && !state.live && !chat.locked && state.editingId !== last.id) {
+  if (last.role === 'user' && !state.live && state.editingId !== last.id) {
     const row = document.createElement('div');
     row.className = 'gen-row';
     row.innerHTML = '<button type="button" class="btn ghost" data-act="reply">Ask Knox to answer</button>';
@@ -265,7 +263,7 @@ function messageNode(chat, m, isLast) {
     node.append(bubble);
     const actions = document.createElement('div');
     actions.className = 'msg-actions';
-    actions.innerHTML = act('copy', 'Copy', 'copy') + act('edit', 'Edit', 'edit', !!state.live || chat.locked) + act('delete', 'Delete', 'trash');
+    actions.innerHTML = act('copy', 'Copy', 'copy') + act('edit', 'Edit', 'edit', !!state.live) + act('delete', 'Delete', 'trash');
     node.append(actions);
     return node;
   }
@@ -319,7 +317,7 @@ function paintAssistant(node, chat, m, isLast) {
 
   const notes = [];
   if (v.status === 'error') {
-    const retry = isLast && !chat.locked && !state.live ? '<button type="button" class="btn ghost" data-act="regen">Retry</button>' : '';
+    const retry = isLast && !state.live ? '<button type="button" class="btn ghost" data-act="regen">Retry</button>' : '';
     notes.push(`<div class="err"><span>${escapeHtml(v.error || 'Something went wrong.')}</span>${retry}</div>`);
   }
   if (v.status === 'stopped') notes.push('<p class="note">Stopped. Knox won’t remember this reply.</p>');
@@ -337,7 +335,7 @@ function paintAssistant(node, chat, m, isLast) {
   let html = '';
   if (!live) {
     if (v.content) html += act('copy', 'Copy', 'copy');
-    if (isLast) html += act('regen', 'Regenerate', 'regen', chat.locked || !!state.live);
+    if (isLast) html += act('regen', 'Regenerate', 'regen', !!state.live);
     html += act('delete', 'Delete', 'trash');
     if (m.variants.length > 1) {
       html += `<span class="variants">${act('prev', 'Previous version', 'left', m.vi === 0 || !!state.live)}<span>${m.vi + 1}/${m.variants.length}</span>${act('next', 'Next version', 'right', m.vi === m.variants.length - 1 || !!state.live)}</span>`;
@@ -367,10 +365,6 @@ function schedulePatch() {
 }
 
 function updateComposer() {
-  const chat = activeChat();
-  const locked = !!chat?.locked;
-  els.composer.hidden = locked;
-  els.locked.hidden = !locked;
   const live = !!state.live;
   els.send.classList.toggle('stop', live);
   els.send.innerHTML = live ? ICONS.stop : ICONS.send;
@@ -391,7 +385,7 @@ function renderDrawer() {
   }
   els.chatList.innerHTML = list.map((c) => `
     <li class="chat-item${c.id === state.activeId ? ' active' : ''}" data-id="${escapeHtml(c.id)}">
-      <button type="button" class="chat-open" data-act="open"><span class="t">${escapeHtml(c.title || 'Untitled')}</span><span class="d">${c.locked ? 'sealed · ' : ''}${when(c.updated)}</span></button>
+      <button type="button" class="chat-open" data-act="open"><span class="t">${escapeHtml(c.title || 'Untitled')}</span><span class="d">${when(c.updated)}</span></button>
       ${act('delete-chat', 'Delete chat', 'trash')}
     </li>`).join('');
 }
@@ -496,10 +490,8 @@ async function generate(chat, m) {
     if (v.thinkMs == null) v.thinkMs = Date.now() - v.started;
     state.live = null;
     scene.setMood('idle');
-    if (v.status === 'done' && LOCKDOWN.test(v.content)) {
-      chat.locked = true;
-      scene.startle();
-    }
+    // Knox babbling at someone makes the creatures jump; the chat itself carries on.
+    if (v.status === 'done' && BABY_TALK.test(v.content)) scene.startle();
     chat.updated = Date.now();
     persist();
     if (chat.id === state.activeId) {
@@ -516,9 +508,8 @@ function send(raw) {
   const text = raw.trim();
   if (!text || state.live) return;
   let chat = activeChat();
-  if (chat?.locked) return;
   if (!chat) {
-    chat = { id: uid(), title: '', created: Date.now(), updated: Date.now(), messages: [], locked: false };
+    chat = { id: uid(), title: '', created: Date.now(), updated: Date.now(), messages: [] };
     state.chats.push(chat);
     state.activeId = chat.id;
   }
@@ -537,7 +528,7 @@ function stop() {
 
 function replyToLast() {
   const chat = activeChat();
-  if (!chat || chat.locked || state.live) return;
+  if (!chat || state.live) return;
   const reply = { id: uid(), role: 'assistant', variants: [], vi: 0 };
   chat.messages.push(reply);
   generate(chat, reply);
@@ -545,7 +536,7 @@ function replyToLast() {
 
 function regenerate(id) {
   const chat = activeChat();
-  if (!chat || chat.locked || state.live) return;
+  if (!chat || state.live) return;
   const m = chat.messages[chat.messages.length - 1];
   if (m?.id !== id || m.role !== 'assistant') return;
   generate(chat, m);
@@ -566,7 +557,7 @@ function commitEdit(id, raw) {
   const text = raw.trim();
   const chat = activeChat();
   const i = chat?.messages.findIndex((x) => x.id === id) ?? -1;
-  if (!text || i < 0 || state.live || chat.locked) return;
+  if (!text || i < 0 || state.live) return;
   state.editingId = null;
   chat.messages[i].content = text;
   chat.messages.splice(i + 1);
@@ -650,7 +641,7 @@ els.messages.addEventListener('click', (e) => {
       copyText(m.role === 'user' ? m.content : plain(variant(m).content));
       break;
     case 'edit':
-      if (state.live || chat.locked) return;
+      if (state.live) return;
       state.editingId = m.id;
       renderThread();
       {
@@ -712,7 +703,6 @@ els.composer.addEventListener('submit', (e) => {
   else send(els.input.value);
 });
 
-els.lockedNew.addEventListener('click', newChat);
 els.newChat.addEventListener('click', newChat);
 els.drawerNew.addEventListener('click', newChat);
 els.openDrawer.addEventListener('click', openDrawer);

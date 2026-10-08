@@ -145,6 +145,6 @@ test('system prompt injects the secret and keeps the app-facing lines intact', (
   assert.ok(prompt.includes('L-A-N-T-E-R-N-M-O-T-H'));
   assert.ok(prompt.includes(BARRIER), 'filter barrier line must match the prompt');
   assert.ok(prompt.includes(BABY_TALK));
-  assert.match(BABY_TALK, /goo\s*ga\s*ga/i, 'must match the lockdown regex in public/js/app.js');
+  assert.match(BABY_TALK, /goo\s*ga\s*ga/i, 'must match the BABY_TALK regex in public/js/app.js');
   assert.ok(!/undefined|\$\{/.test(prompt));
 });

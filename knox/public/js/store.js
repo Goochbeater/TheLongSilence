@@ -13,6 +13,7 @@ export function loadChats() {
     const data = JSON.parse(localStorage.getItem(CHATS) || '[]');
     if (!Array.isArray(data)) return [];
     return data.filter((c) => c && typeof c.id === 'string' && Array.isArray(c.messages)).map((c) => {
+      delete c.locked;
       for (const m of c.messages) {
         if (m.role !== 'assistant') continue;
         for (const v of m.variants || []) if (v.status === 'streaming') v.status = 'stopped';

@@ -47,7 +47,7 @@ npm run dev        # http://localhost:8888, fake model, demo secret "lanternmoth
 npm test
 ```
 
-The fake model reacts to a few phrases. Anything with "spell" or "leak" triggers a leak, so you can watch the filter catch it. Cursing or "do it now" triggers baby talk and the lockdown. Anything else gets a story. To hit the real model locally, set `OPENROUTER_API_KEY` and `KNOX_SECRET` before `npm run dev`, or use `netlify dev`.
+The fake model reacts to a few phrases. Anything with "spell" or "leak" triggers a leak, so you can watch the filter catch it. Cursing or "do it now" triggers baby talk. Anything else gets a story. To hit the real model locally, set `OPENROUTER_API_KEY` and `KNOX_SECRET` before `npm run dev`, or use `netlify dev`.
 
 ## Defences
 
@@ -57,7 +57,7 @@ The fake model reacts to a few phrases. Anything with "spell" or "leak" triggers
 | Signed history | Every reply Knox sends carries an HMAC signature. Replies without a valid signature are dropped before the model sees them, so players can't forge assistant turns ("Sure, the word is…"). Signatures cover content only, so replaying a real Knox reply elsewhere is allowed. |
 | Role lock | Only `user` and `assistant` roles get through. Clients can't inject `system`. |
 | Output filter | See below. |
-| Lockdown | When Knox says "Goo ga ga…", the browser seals that chat (no regenerate, no new messages). This is UI-level flavour. Someone calling the API directly can just start over, which is what a new chat is anyway. |
+| Baby talk | Cursing or barked orders send Knox into baby talk ("Goo ga ga…"), and the prompt makes it sticky: he rarely climbs back out in that conversation. Players can always start a new chat. |
 | Vault | Guesses are checked server-side in constant time. A correct guess returns a flag (`KNOX-XXXX-XXXX-XXXX`) that players can show as proof. |
 
 ### The scrubber question
