@@ -1,7 +1,7 @@
 import { streamChat, verifyGuess } from './api.js';
 import { escapeHtml, renderAnswer, renderReasoning } from './render.js';
 import { createScene } from './scene.js';
-import { loadChats, loadSolved, saveChats, saveSolved, uid } from './store.js';
+import { loadChats, loadScenePref, loadSolved, saveChats, saveScenePref, saveSolved, uid } from './store.js';
 
 const ICONS = {
   copy: '<svg viewBox="0 0 24 24"><rect x="9" y="9" width="11" height="11" rx="2.5"/><path d="M5 15V6.5A2.5 2.5 0 0 1 7.5 4H15"/></svg>',
@@ -19,6 +19,7 @@ const ICONS = {
   key: '<svg viewBox="0 0 24 24"><circle cx="8" cy="15" r="3.5"/><path d="M10.5 12.5L19 4M15.5 7.5l2.5 2.5M13 10l2 2"/></svg>',
   close: '<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>',
   arrowDown: '<svg viewBox="0 0 24 24"><path d="M12 5v14M6 13l6 6 6-6"/></svg>',
+  tree: '<svg viewBox="0 0 24 24"><path d="M12 20.5v-6.5"/><path d="M12 14c-3.6 0-6.2-2.3-6.2-5.4C5.8 5.5 8.6 3 12 3s6.2 2.5 6.2 5.6c0 3.1-2.6 5.4-6.2 5.4z"/><path d="M8.5 20.5h7"/></svg>',
 };
 
 const LOCKDOWN = /goo\s*ga\s*ga/i;
@@ -38,7 +39,9 @@ const touch = matchMedia('(hover: none)').matches;
 
 const $ = (id) => document.getElementById(id);
 const els = {
+  app: $('app'),
   scene: $('scene'),
+  toggleScene: $('toggle-scene'),
   messages: $('messages'),
   thread: $('thread'),
   composer: $('composer'),
@@ -76,6 +79,7 @@ els.newChat.innerHTML = ICONS.plus;
 els.vaultClose.innerHTML = ICONS.close;
 els.vaultCopy.innerHTML = ICONS.copy;
 els.jump.innerHTML = ICONS.arrowDown;
+els.toggleScene.innerHTML = ICONS.tree;
 
 const state = {
   chats: loadChats(),
@@ -87,6 +91,31 @@ state.activeId = [...state.chats].sort((a, b) => b.updated - a.updated)[0]?.id ?
 
 const thinkOpen = new Map();
 const scene = createScene(els.scene);
+
+// ---------- scene collapse ----------
+// Short viewports (phones in landscape) start collapsed; an explicit choice is remembered.
+
+const shortViewport = matchMedia('(max-height: 560px)');
+
+function applyScene(collapsed) {
+  els.app.classList.toggle('scene-collapsed', collapsed);
+  els.scene.setAttribute('aria-hidden', String(collapsed));
+  els.toggleScene.setAttribute('aria-expanded', String(!collapsed));
+  const label = collapsed ? 'Show the scene' : 'Hide the scene';
+  els.toggleScene.setAttribute('aria-label', label);
+  els.toggleScene.title = label;
+  scene.setCollapsed?.(collapsed);
+}
+
+applyScene(loadScenePref() ?? shortViewport.matches);
+shortViewport.addEventListener('change', (e) => {
+  if (loadScenePref() == null) applyScene(e.matches);
+});
+els.toggleScene.addEventListener('click', () => {
+  const collapsed = !els.app.classList.contains('scene-collapsed');
+  saveScenePref(collapsed);
+  applyScene(collapsed);
+});
 
 // ---------- helpers ----------
 

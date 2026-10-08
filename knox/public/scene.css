@@ -1,0 +1,184 @@
+/* The header scene. Everything here is decorative: the scene is pointer-events: none
+   apart from the title, and collapsing it (.app.scene-collapsed) only changes its height. */
+
+
+.scene {
+  position: relative;
+  flex: 0 0 var(--scene-h);
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background:
+    radial-gradient(ellipse 38% 90% at var(--tree-x, 80%) 100%, rgba(147, 189, 116, .055), transparent 70%),
+    linear-gradient(to bottom, var(--bg) 0%, #0c0f0d 100%);
+  transition: flex-basis .35s ease;
+}
+
+.scene::after {
+  content: '';
+  position: absolute;
+  left: 0; right: 0;
+  bottom: 0;
+  height: var(--ground, 12px);
+  background: linear-gradient(to bottom, #121813, var(--bg));
+  border-top: 1px solid #1c271d;
+  z-index: 0;
+}
+
+.scene.thud { animation: thud .16s ease-out; }
+@keyframes thud { 40% { transform: translateY(1px); } }
+
+.scene-layer { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.scene-back { z-index: 1; }
+.knox-title { z-index: 2; }
+.scene-critters { z-index: 3; }
+.scene-front { z-index: 4; }
+
+/* tree */
+.branch {
+  fill: none;
+  stroke: #4a3c2e;
+  stroke-linecap: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: grow var(--dur, .6s) cubic-bezier(.3, .1, .3, 1) var(--delay, 0s) forwards;
+}
+.branch.d0 { stroke: #3f3328; }
+@keyframes grow { to { stroke-dashoffset: 0; } }
+
+.leaf {
+  transform-box: fill-box;
+  transform-origin: center;
+  transform: scale(0);
+  animation: pop .7s cubic-bezier(.3, 1.6, .5, 1) var(--delay, 0s) forwards;
+}
+.blossom { fill: #efc6cf; }
+.blossom.w { fill: #fff3e8; }
+@keyframes pop { to { transform: scale(1); } }
+
+/* grass */
+.grass path { fill: currentColor; }
+.grass-back { color: #22301f; }
+.grass-front { color: #2d4028; }
+.sway {
+  transform-box: fill-box;
+  transform-origin: 50% 100%;
+  animation: sway var(--dur, 5s) ease-in-out var(--delay, 0s) infinite alternate;
+}
+@keyframes sway {
+  from { transform: skewX(calc(var(--amp, 4deg) * -1)); }
+  to { transform: skewX(var(--amp, 4deg)); }
+}
+
+/* critters */
+.critter { fill: #b9b1a1; }
+.critter .ear { fill: #c9a49c; }
+.critter .eye { fill: #0a0c0b; }
+.critter .nose { fill: #d99b93; }
+.critter .leg { fill: #9d9585; }
+.critter .tail-line { fill: none; stroke: #a69e8e; stroke-width: 1.2; stroke-linecap: round; }
+.squirrel { fill: #9a6a46; }
+.squirrel .tail-line { stroke: #8a5c3b; stroke-width: 5; }
+.squirrel .belly { fill: #c49a74; }
+.squirrel .leg { fill: #7f5638; }
+.bird { fill: #7b8792; }
+.bird .breast { fill: #cf8a5c; }
+.bird .beak { fill: #e2b46c; }
+.bird .wing { fill: #66717b; }
+.bird .leg-line { stroke: #8e8676; stroke-width: .8; }
+.snail .shell { fill: #8a7457; }
+.snail .spiral { fill: none; stroke: #5f4e39; stroke-width: 1; }
+.snail .foot { fill: #cbc2ad; }
+.snail .stalk { fill: none; stroke: #cbc2ad; stroke-width: .9; stroke-linecap: round; }
+.firefly { fill: #f2d27c; }
+
+/* wood-block title */
+.knox-title {
+  position: absolute;
+  left: var(--col-left, 16px);
+  bottom: calc(var(--ground, 12px) - 2px);
+  display: flex;
+  align-items: flex-end;
+  gap: calc(var(--bs) * .1);
+  --bs: 54px;
+  pointer-events: auto;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.block {
+  position: relative;
+  width: var(--bs);
+  height: var(--bs);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-block);
+  font-size: calc(var(--bs) * .6);
+  line-height: 1;
+  padding-top: calc(var(--bs) * .04);
+  color: #5d3a1c;
+  border-radius: calc(var(--bs) * .1);
+  background:
+    radial-gradient(ellipse 22% 9% at var(--knot-x, 28%) var(--knot-y, 72%), rgba(70, 38, 14, .38), transparent 70%),
+    repeating-linear-gradient(var(--grain, 177deg), rgba(84, 48, 20, 0) 0 3px, rgba(84, 48, 20, .16) 3px 4px, rgba(84, 48, 20, 0) 4px 8px, rgba(84, 48, 20, .08) 8px 9px, rgba(84, 48, 20, 0) 9px 13px),
+    linear-gradient(158deg, var(--wood-hi, #d7a165), var(--wood, #b47b45) 55%, var(--wood-lo, #93603a));
+  box-shadow:
+    inset 0 2px 0 rgba(255, 228, 188, .35),
+    inset 2px 0 0 rgba(255, 228, 188, .12),
+    inset -2px 0 0 rgba(60, 30, 10, .22),
+    inset 0 -3px 0 rgba(60, 30, 10, .38),
+    0 7px 12px -5px rgba(0, 0, 0, .8);
+  text-shadow: 0 1px 0 rgba(255, 226, 182, .38), 0 -1px 0 rgba(40, 18, 4, .55);
+  transform-origin: 50% 100%;
+  transform: rotate(var(--r1, 0deg));
+  opacity: 1;
+}
+.block::before {
+  content: '';
+  position: absolute;
+  inset: calc(var(--bs) * .085);
+  border: 1.5px solid rgba(86, 48, 20, .32);
+  border-radius: calc(var(--bs) * .06);
+  box-shadow: 0 1px 0 rgba(255, 226, 182, .14);
+}
+
+.knox-title.drop .block {
+  opacity: 0;
+  animation: fall 1.15s calc(var(--i) * .14s + .2s) forwards;
+}
+@keyframes fall {
+  0% { transform: translateY(calc(var(--scene-h) * -1.2)) rotate(var(--r0)); opacity: 0; animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  6% { opacity: 1; }
+  52% { transform: translateY(0) rotate(var(--r1)) scale(1.06, .9); animation-timing-function: cubic-bezier(.2, .7, .4, 1); }
+  66% { transform: translateY(-15px) rotate(calc(var(--r1) * -.6)) scale(.97, 1.03); animation-timing-function: cubic-bezier(.55, 0, 1, .45); }
+  79% { transform: translateY(0) rotate(var(--r1)) scale(1.03, .96); animation-timing-function: cubic-bezier(.2, .7, .4, 1); }
+  89% { transform: translateY(-3px) rotate(var(--r1)); }
+  100% { transform: translateY(0) rotate(var(--r1)); opacity: 1; }
+}
+
+.knox-title.hop .block { animation: hop .5s calc(var(--i) * .08s) cubic-bezier(.3, .6, .4, 1); }
+@keyframes hop {
+  40% { transform: translateY(-12px) rotate(calc(var(--r1) * -1)); }
+  70% { transform: translateY(0) rotate(var(--r1)) scale(1.04, .95); }
+}
+
+.dust {
+  position: absolute;
+  bottom: 0;
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #6d6458;
+  opacity: .0;
+  pointer-events: none;
+  animation: dust .7s ease-out forwards;
+}
+@keyframes dust {
+  0% { opacity: .55; transform: translate(0, 0) scale(.6); }
+  100% { opacity: 0; transform: translate(var(--dx), var(--dy)) scale(1.6); }
+}
+
+.app.scene-collapsed .scene { flex-basis: 0px; }
+
+@media (max-width: 640px) {
+  .knox-title { --bs: 40px; }
+}

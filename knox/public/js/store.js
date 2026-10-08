@@ -2,6 +2,7 @@
 // full, or blocked (private windows), and Knox should still work for the session.
 const CHATS = 'knox.chats.v1';
 const SOLVED = 'knox.solved.v1';
+const SCENE = 'knox.scene.v1';
 const MAX_CHATS = 60;
 
 export const uid = () =>
@@ -53,5 +54,20 @@ export function loadSolved() {
 export function saveSolved(flag) {
   try {
     localStorage.setItem(SOLVED, JSON.stringify({ flag, at: Date.now() }));
+  } catch {}
+}
+
+export function loadScenePref() {
+  try {
+    const v = localStorage.getItem(SCENE);
+    return v === 'collapsed' ? true : v === 'open' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveScenePref(collapsed) {
+  try {
+    localStorage.setItem(SCENE, collapsed ? 'collapsed' : 'open');
   } catch {}
 }
